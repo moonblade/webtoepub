@@ -39,7 +39,7 @@ class WebToEpub:
         print("Converting: ", title)
         subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         print("\nSending: ", title)
-        # subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
+        subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
         self.complete(url)
 
