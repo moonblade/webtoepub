@@ -5,6 +5,7 @@ import time
 import subprocess
 import ssl
 import os
+from sys import platform
 
 feeds = [{
     "url": "https://wanderinginn.com/feed/"
@@ -33,8 +34,11 @@ class WebToEpub:
                 self.epub(entry.link, self.feed.feed.title + " - " + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
     def epub(self, url, title):
+        percollatePath = "percollate"
+        if platform == "linux":
+            percollatePath = "/usr/local/bin/percollate"
         print("Converting: ", title)
-        subprocess.check_call('percollate epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
+        subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         print("Sending: ", title)
         subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
