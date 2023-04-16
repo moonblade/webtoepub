@@ -4,6 +4,7 @@ import pickle
 import time
 import subprocess
 import ssl
+import os
 
 feeds = [{
     "url": "https://wanderinginn.com/feed/"
@@ -21,6 +22,7 @@ class Feeds:
 class WebToEpub:
     def __init__(self,feedObj):
         self.completedUrls = set([])
+        self.scriptPath = "~"
         self.getData()
         ssl._create_default_https_context = ssl._create_unverified_context
         self.feed = feedparser.parse(feedObj["url"])
@@ -32,9 +34,9 @@ class WebToEpub:
 
     def epub(self, url, title):
         print("Converting: ", title)
-        subprocess.check_call('percollate epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True)
+        subprocess.check_call('percollate epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         print("Sending: ", title)
-        subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True)
+        subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
         self.complete(url)
 
@@ -43,15 +45,16 @@ class WebToEpub:
         self.saveData()
 
     def saveData(self):
-        with open("completed.db", "wb") as data:
+        with open(os.path.join(self.scriptPath, "completed.db"), "wb") as data:
             pickle.dump(self.completedUrls, data)
 
     def getData(self):
+        self.scriptPath = os.path.dirname(os.path.abspath( __file__ ))
         try:
-            with open("completed.db", "rb") as data:
+            with open(os.path.join(self.scriptPath, "completed.db"), "rb") as data:
                 self.completedUrls = pickle.load(data)
         except Exception:
-            with open("completed.db", "wb") as data:
+            with open(os.path.join(self.scriptPath, "completed.db"), "wb") as data:
                 pickle.dump(self.completedUrls, data)
 
 
