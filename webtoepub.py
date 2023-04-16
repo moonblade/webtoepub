@@ -36,7 +36,7 @@ class WebToEpub:
     def epub(self, url, title):
         percollatePath = "percollate"
         if platform == "linux":
-            percollatePath = "/usr/local/bin/percollate"
+            percollatePath = "/home/moonblade/.nvm/versions/node/v19.9.0/bin/percollate"
         print("Converting: ", title)
         subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         print("Sending: ", title)
