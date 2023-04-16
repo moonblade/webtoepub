@@ -6,7 +6,7 @@ So what this script does is, it takes the RSS feed of the webseries, checks the 
 
 # Screenshot
 
-Kindle updated with the job
+Kindle screen after running the script
 
 <img width="593" alt="image" src="https://user-images.githubusercontent.com/9362269/232269180-67b13efa-d80c-428d-93c4-6cba9575b0f4.png">
 
