@@ -6,14 +6,13 @@ import subprocess
 import ssl
 import os
 from sys import platform
-
-feeds = [{
-    "url": "https://wanderinginn.com/feed/"
-}]
+import requests
 
 class Feeds:
-    def __init__(self, feeds):
+    def __init__(self):
         convertors = []
+        r = requests.get('https://browse.moonblade.work/api/public/dl/cVkFNclG?inline=true')
+        feeds = r.json()
         for feed in feeds:
             convertor = WebToEpub(feed)
             convertors.append(convertor)
@@ -31,7 +30,7 @@ class WebToEpub:
     def convert(self):
         for entry in self.feed.entries[::-1]:
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
-                self.epub(entry.link, self.feed.feed.title + " - " + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                self.epub(entry.link, (self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else ""  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
     def epub(self, url, title):
         percollatePath = "percollate"
@@ -39,8 +38,8 @@ class WebToEpub:
             percollatePath = "/home/moonblade/.nvm/versions/node/v19.9.0/bin/percollate"
         print("Converting: ", title)
         subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
-        print("Sending: ", title)
-        subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
+        print("\nSending: ", title)
+        # subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
         self.complete(url)
 
@@ -63,4 +62,4 @@ class WebToEpub:
 
 
 
-main = Feeds(feeds)
+main = Feeds()
