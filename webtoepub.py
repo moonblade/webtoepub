@@ -28,7 +28,7 @@ class WebToEpub:
     def convert(self):
         for entry in self.feed.entries[::-1]:
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
-                self.epub(entry.link, self.feed.feed.title + " - " + entry.title + "(" + time.strftime("%Y-%m-%d", entry.published_parsed) + ")")
+                self.epub(entry.link, self.feed.feed.title + " - " + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
     def epub(self, url, title):
         print("Converting: ", title)
