@@ -30,14 +30,18 @@ class WebToEpub:
     def convert(self):
         for entry in self.feed.entries[::-1]:
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
-                self.epub(entry.link, (self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else ""  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
     def epub(self, url, title):
         percollatePath = "percollate"
+        ebookConvertPath = "ebook-convert"
         if platform == "linux":
             percollatePath = "/home/moonblade/.nvm/versions/node/v19.9.0/bin/percollate"
-        print("Converting: ", title)
-        subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
+            ebookConvertPath = "/Applications/calibre.app/Contents/MacOS//ebook-convert"
+        print("Downloading: ", title)
+        subprocess.check_call(percollatePath + ' pdf ' + url + ' -o "output/' + title +  '.pdf" -t "' + title + '"', shell=True, cwd=self.scriptPath)
+        print("\nConverting: ", title)
+        subprocess.check_call(ebookConvertPath + ' "output/' + title +  '.pdf" "output/' + title + '.epub"', shell=True, cwd=self.scriptPath)
         print("\nSending: ", title)
         subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
