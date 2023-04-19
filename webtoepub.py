@@ -50,8 +50,8 @@ class WebToEpub:
         # subprocess.check_call(percollatePath + ' pdf ' + url + ' -o "output/' + title +  '.pdf" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         # print("\nConverting: ", title)
         # subprocess.check_call(ebookConvertPath + ' "output/' + title +  '.pdf" "output/' + title + '.epub"', shell=True, cwd=self.scriptPath)
-        print("\nSending: ", title)
         if (not args.dry_run):
+            print("\nSending: ", title)
             subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
         if (not args.dry_run and not args.no_update_db):
