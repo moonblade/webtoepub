@@ -11,7 +11,7 @@ import requests
 
 parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
 parser.add_argument('-n', '--dry-run', action='store_true')
-parser.add_argument('-u', '--no-update-db', action='store_true')
+parser.add_argument('-u', '--update-db', action='store_true')
 args = parser.parse_args()
 
 
@@ -54,7 +54,7 @@ class WebToEpub:
             print("\nSending: ", title)
             subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
-        if (not args.dry_run and not args.no_update_db):
+        if (not args.dry_run or args.update_db):
             self.complete(url)
 
     def complete(self, url):
