@@ -1,4 +1,5 @@
 #!/usr/local/bin/python3
+import argparse
 import feedparser
 import pickle
 import time
@@ -7,6 +8,12 @@ import ssl
 import os
 from sys import platform
 import requests
+
+parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
+parser.add_argument('-n', '--dry-run', action='store_true')
+parser.add_argument('-u', '--no-update-db', action='store_true')
+args = parser.parse_args()
+
 
 class Feeds:
     def __init__(self):
@@ -44,9 +51,11 @@ class WebToEpub:
         # print("\nConverting: ", title)
         # subprocess.check_call(ebookConvertPath + ' "output/' + title +  '.pdf" "output/' + title + '.epub"', shell=True, cwd=self.scriptPath)
         print("\nSending: ", title)
-        subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
+        if (not args.dry_run):
+            subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
-        self.complete(url)
+        if (not args.dry_run and not args.no_update_db):
+            self.complete(url)
 
     def complete(self, url):
         self.completedUrls.add(url)
