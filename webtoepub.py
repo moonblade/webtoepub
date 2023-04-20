@@ -4,6 +4,7 @@ import feedparser
 import pickle
 import time
 import subprocess
+from requests_html import HTMLSession
 import ssl
 import os
 from sys import platform
@@ -46,7 +47,15 @@ class WebToEpub:
             percollatePath = "/home/moonblade/.nvm/versions/node/v19.9.0/bin/percollate"
             ebookConvertPath = "/Applications/calibre.app/Contents/MacOS//ebook-convert"
         print("Downloading: ", title)
-        subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
+        session = HTMLSession()
+        r = session.get(url)
+        r.html.render()
+        print(r.html.html)
+        print(dir(r.html))
+
+        with open("/tmp/article.html", "w") as file:
+            file.write(str(r.html.html))
+        # subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         # subprocess.check_call(percollatePath + ' pdf ' + url + ' -o "output/' + title +  '.pdf" -t "' + title + '"', shell=True, cwd=self.scriptPath)
         # print("\nConverting: ", title)
         # subprocess.check_call(ebookConvertPath + ' "output/' + title +  '.pdf" "output/' + title + '.epub"', shell=True, cwd=self.scriptPath)
@@ -73,7 +82,5 @@ class WebToEpub:
         except Exception:
             with open(os.path.join(self.scriptPath, "completed.db"), "wb") as data:
                 pickle.dump(self.completedUrls, data)
-
-
 
 main = Feeds()
