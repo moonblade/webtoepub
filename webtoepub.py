@@ -34,10 +34,15 @@ class WebToEpub:
         self.scriptPath = "~"
         self.getData()
         ssl._create_default_https_context = ssl._create_unverified_context
-        self.feed = feedparser.parse(feedObj["url"])
+        self.feed = None
+        if ("url" in feedObj):
+            self.feed = feedparser.parse(feedObj["url"])
 
     def convert(self):
+        if not self.feed:
+            return
         for entry in self.feed.entries[::-1]:
+            print(entry.title)
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
                 self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
