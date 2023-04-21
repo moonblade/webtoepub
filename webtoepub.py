@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 import argparse
 import feedparser
+from bs4 import BeautifulSoup
 import pickle
 import time
 import subprocess
@@ -40,25 +41,27 @@ class WebToEpub:
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
                 self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
+    def clean(self, url, html):
+        cleanedHtml = html
+        if ("wanderinginn" in url):
+            cleanedHtml = cleanedHtml.find("article")[0]
+            cleanedHtml = cleanedHtml.find(".entry-content")[0]
+            soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
+            for video in soup.find_all("div", {"class": "video-player"}):
+                video.extract()
+            return soup.prettify()
+
+        return cleanedHtml.html
+
     def epub(self, url, title):
-        percollatePath = "percollate"
-        ebookConvertPath = "ebook-convert"
-        if platform == "linux":
-            percollatePath = "/home/moonblade/.nvm/versions/node/v19.9.0/bin/percollate"
-            ebookConvertPath = "/Applications/calibre.app/Contents/MacOS//ebook-convert"
         print("Downloading: ", title)
         session = HTMLSession()
         r = session.get(url)
         r.html.render()
-        print(r.html.html)
-        print(dir(r.html))
-
+        htmlContent = self.clean(url, r.html)
         with open("/tmp/article.html", "w") as file:
-            file.write(str(r.html.html))
-        # subprocess.check_call(percollatePath + ' epub ' + url + ' -o "output/' + title +  '.epub" -t "' + title + '"', shell=True, cwd=self.scriptPath)
-        # subprocess.check_call(percollatePath + ' pdf ' + url + ' -o "output/' + title +  '.pdf" -t "' + title + '"', shell=True, cwd=self.scriptPath)
-        # print("\nConverting: ", title)
-        # subprocess.check_call(ebookConvertPath + ' "output/' + title +  '.pdf" "output/' + title + '.epub"', shell=True, cwd=self.scriptPath)
+            file.write(str(htmlContent))
+        subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '"', shell=True, cwd=self.scriptPath)
         if (not args.dry_run):
             print("\nSending: ", title)
             subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
