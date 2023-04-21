@@ -38,8 +38,6 @@ class WebToEpub:
 
     def convert(self):
         for entry in self.feed.entries[::-1]:
-            if "745" in entry.title:
-                self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
                 self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
