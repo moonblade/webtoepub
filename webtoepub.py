@@ -57,7 +57,6 @@ class WebToEpub:
         print("Downloading: ", title)
         session = HTMLSession()
         r = session.get(url)
-        r.html.render()
         htmlContent = self.clean(url, r.html)
         with open("/tmp/article.html", "w") as file:
             file.write(str(htmlContent))
