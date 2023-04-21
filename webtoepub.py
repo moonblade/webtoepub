@@ -38,11 +38,17 @@ class WebToEpub:
 
     def convert(self):
         for entry in self.feed.entries[::-1]:
+            if "745" in entry.title:
+                self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
             if entry.link not in self.completedUrls and "Protected:" not in entry.title:
                 self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
     def clean(self, url, html):
         cleanedHtml = html
+        if ("royalroad" in url):
+            cleanedHtml = cleanedHtml.find(".chapter-inner.chapter-content")[0]
+            return str(cleanedHtml.html)
+
         if ("wanderinginn" in url):
             cleanedHtml = cleanedHtml.find("article")[0]
             cleanedHtml = cleanedHtml.find(".entry-content")[0]
@@ -59,7 +65,7 @@ class WebToEpub:
         r = session.get(url)
         htmlContent = self.clean(url, r.html)
         with open("/tmp/article.html", "w") as file:
-            file.write(str(htmlContent))
+            file.write(htmlContent)
         subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '" --metadata lang="en-US"', shell=True, cwd=self.scriptPath)
         if (not args.dry_run):
             print("\nSending: ", title)
