@@ -9,23 +9,25 @@ from requests_html import HTMLSession
 import ssl
 import os
 from sys import platform
-import requests
+import json
 
 parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
 parser.add_argument('-n', '--dry-run', action='store_true')
 parser.add_argument('-u', '--update-db', action='store_true')
+parser.add_argument('-l', '--link', default=None)
 args = parser.parse_args()
 
 
 class Feeds:
     def __init__(self):
         convertors = []
-        r = requests.get('https://browse.moonblade.work/api/public/dl/cVkFNclG?inline=true')
-        feeds = r.json()
-        for feed in feeds:
-            convertor = WebToEpub(feed)
-            convertors.append(convertor)
-            convertor.convert()
+        # r = requests.get('https://browse.moonblade.work/api/public/dl/cVkFNclG?inline=true')
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "feed.input.json"), "r") as f:
+            feeds = json.load(f)
+            for feed in feeds:
+                convertor = WebToEpub(feed)
+                convertors.append(convertor)
+                convertor.convert()
 
 
 class WebToEpub:
@@ -42,7 +44,7 @@ class WebToEpub:
         if not self.feed:
             return
         for entry in self.feed.entries[::-1]:
-            if entry.link not in self.completedUrls and "Protected:" not in entry.title:
+            if entry.link not in self.completedUrls and "Patron Early Access:" not in entry.title:
                 self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
 
     def clean(self, url, html):
@@ -71,7 +73,7 @@ class WebToEpub:
         subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '" --metadata lang="en-US"', shell=True, cwd=self.scriptPath)
         if (not args.dry_run):
             print("\nSending: ", title)
-            subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
+            # subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
         if (not args.dry_run or args.update_db):
             self.complete(url)
