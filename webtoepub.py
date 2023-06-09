@@ -8,7 +8,6 @@ import subprocess
 from requests_html import HTMLSession
 import ssl
 import os
-from sys import platform
 import json
 
 parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
@@ -17,12 +16,12 @@ parser.add_argument('-u', '--update-db', action='store_true')
 parser.add_argument('-l', '--link', default=None)
 args = parser.parse_args()
 
+scriptPath = os.path.dirname(os.path.abspath( __file__ ))
 
 class Feeds:
     def __init__(self):
         convertors = []
-        # r = requests.get('https://browse.moonblade.work/api/public/dl/cVkFNclG?inline=true')
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "feed.input.json"), "r") as f:
+        with open(os.path.join(scriptPath, "feed.input.json"), "r") as f:
             feeds = json.load(f)
             for feed in feeds:
                 convertor = WebToEpub(feed)
@@ -95,4 +94,20 @@ class WebToEpub:
             with open(os.path.join(self.scriptPath, "completed.db"), "wb") as data:
                 pickle.dump(self.completedUrls, data)
 
-main = Feeds()
+def removeLink():
+    with open(os.path.join(scriptPath, "completed.db"), "rb") as data:
+        completedUrls = pickle.load(data)
+    if args.link in completedUrls:
+        completedUrls.remove(args.link)
+    with open(os.path.join(scriptPath, "completed.db"), "wb") as data:
+        pickle.dump(completedUrls, data)
+
+def main():
+    if args.link:
+        if args.update_db:
+            removeLink()
+    else:
+        Feeds()
+
+if __name__ == "__main__":
+    main()
