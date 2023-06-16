@@ -58,6 +58,8 @@ class WebToEpub:
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
             for video in soup.find_all("div", {"class": "video-player"}):
                 video.extract()
+            for img in soup.find_all("img", {"class": "alignnone"}):
+                img.extract()
             return soup.prettify()
 
         return cleanedHtml.html
