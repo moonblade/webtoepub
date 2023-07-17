@@ -13,6 +13,7 @@ import json
 parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
 parser.add_argument('-n', '--dry-run', action='store_true')
 parser.add_argument('-u', '--update-db', action='store_true')
+parser.add_argument('-i', '--remove-images', action='store_true')
 parser.add_argument('-l', '--link', default=None)
 args = parser.parse_args()
 
@@ -44,7 +45,12 @@ class WebToEpub:
             return
         for entry in self.feed.entries[::-1]:
             if entry.link not in self.completedUrls and "Patron Early Access:" not in entry.title:
-                self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                try:
+                    self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                except:
+                    args.remove_images = True
+                    self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+
 
     def clean(self, url, html):
         cleanedHtml = html
@@ -58,8 +64,9 @@ class WebToEpub:
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
             for video in soup.find_all("div", {"class": "video-player"}):
                 video.extract()
-            for img in soup.find_all("img", {"class": "alignnone"}):
-                img.extract()
+            if args.remove_images:
+                for img in soup.find_all("img", {"class": "alignnone"}):
+                    img.extract()
             return soup.prettify()
 
         return cleanedHtml.html
