@@ -48,8 +48,11 @@ class WebToEpub:
                 try:
                     self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
                 except:
-                    args.remove_images = True
-                    self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                    try:
+                        args.remove_images = True
+                        self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                    except Exception as e:
+                        print("Exception ", str(e))
 
 
     def clean(self, url, html):
@@ -64,8 +67,10 @@ class WebToEpub:
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
             for video in soup.find_all("div", {"class": "video-player"}):
                 video.extract()
+            for video in soup.find_all("span", {"class": "embed-youtube"}):
+                video.extract()
             if args.remove_images:
-                for img in soup.find_all("img", {"class": "alignnone"}):
+                for img in soup.find_all("div", {"class": "gallery"}):
                     img.extract()
             return soup.prettify()
 
