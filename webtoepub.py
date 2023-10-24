@@ -85,7 +85,7 @@ class WebToEpub:
         htmlContent = self.clean(url, r.html)
         with open("/tmp/article.html", "w") as file:
             file.write(htmlContent)
-        subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '" --metadata lang="en-US"', shell=True, cwd=self.scriptPath)
+        subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '" --metadata lang="en-US" --css epub.css', shell=True, cwd=self.scriptPath)
         if (not args.dry_run):
             print("\nSending: ", title)
             subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
