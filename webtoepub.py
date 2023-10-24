@@ -70,6 +70,8 @@ class WebToEpub:
             for video in soup.find_all("span", {"class": "embed-youtube"}):
                 video.extract()
             if args.remove_images:
+                for img in soup.find_all("img"):
+                    img.extract()
                 for img in soup.find_all("div", {"class": "gallery"}):
                     img.extract()
             return soup.prettify()
