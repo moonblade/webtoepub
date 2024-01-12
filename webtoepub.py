@@ -79,6 +79,7 @@ class WebToEpub:
         return cleanedHtml.html
 
     def epub(self, url, title):
+        title = title.replace('"', '')
         print("Downloading: ", title)
         session = HTMLSession()
         r = session.get(url)
