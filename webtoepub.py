@@ -56,10 +56,24 @@ class WebToEpub:
 
 
     def clean(self, url, html):
+        keywordsToRemove = ["amazon", "report", "stolen", "pilfer", "without permission", "unauthorized reproduction", "pilfered", "misappropri"]
         cleanedHtml = html
         if ("royalroad" in url):
             cleanedHtml = cleanedHtml.find(".chapter-inner.chapter-content")[0]
-            return str(cleanedHtml.html)
+            soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
+            for para in soup.find_all("p"):
+                if para.getText().count(".") <= 3:
+                    keywordsFound = 0
+                    for keyword in keywordsToRemove:
+                        if keyword in para.getText().lower():
+                            keywordsFound += 1
+                    if keywordsFound >= 2:
+                        para.extract()
+                    # if keywordsFound == 0:
+                    #     with open("/tmp/a.txt", "a") as f:
+                    #         f.write(para.text)
+                    #         f.write("\n---\n\n\n")
+            return soup.prettify()
 
         if ("wanderinginn" in url):
             cleanedHtml = cleanedHtml.find("article")[0]
