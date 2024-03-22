@@ -10,6 +10,8 @@ import ssl
 import os
 import json
 
+KEYWORDS_TO_REMOVE = ["amazon", "report", "stolen", "pilfer", "without permission", "unauthorized reproduction", "pilfered", "misappropri", "royal road", "unlawfully", "unauthorized duplication", "without consent"]
+
 parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
 parser.add_argument('-n', '--dry-run', action='store_true')
 parser.add_argument('-u', '--update-db', action='store_true')
@@ -56,7 +58,7 @@ class WebToEpub:
 
 
     def clean(self, url, html):
-        keywordsToRemove = ["amazon", "report", "stolen", "pilfer", "without permission", "unauthorized reproduction", "pilfered", "misappropri"]
+        keywordsToRemove = KEYWORDS_TO_REMOVE
         cleanedHtml = html
         if ("royalroad" in url):
             cleanedHtml = cleanedHtml.find(".chapter-inner.chapter-content")[0]
@@ -68,6 +70,7 @@ class WebToEpub:
                         if keyword in para.getText().lower():
                             keywordsFound += 1
                     if keywordsFound >= 2:
+                        print(f"{para.getText()} Extracted")
                         para.extract()
                     # if keywordsFound == 0:
                     #     with open("/tmp/a.txt", "a") as f:
