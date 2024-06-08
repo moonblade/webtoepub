@@ -10,7 +10,7 @@ import ssl
 import os
 import json
 
-KEYWORDS_TO_REMOVE = ["amazon", "report", "stolen", "pilfer", "without permission", "unauthorized reproduction", "pilfered", "misappropri", "royal road", "unlawfully", "unauthorized duplication", "without consent"]
+KEYWORDS_TO_REMOVE = ["amazon", "report", "stolen", "pilfer", "without permission", "unauthorized reproduction", "pilfered", "misappropri", "royal road", "unlawfully", "unauthorized duplication", "without consent", "without authorization"]
 
 parser = argparse.ArgumentParser(prog='WebToEpub', description='Get books from feed list and put them in kindle as epub')
 parser.add_argument('-n', '--dry-run', action='store_true')
