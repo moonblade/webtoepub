@@ -68,7 +68,7 @@ class WebToEpub:
             cleanedHtml = cleanedHtml.find(".chapter-inner.chapter-content")[0]
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
             for para in soup.find_all("p"):
-                if para.getText().count(".") <= 3:
+                if para.getText().count(".") <= 3 and para.getText().count(" ") <= 25:
                     keywordsFound = 0
                     for keyword in keywordsToRemove:
                         if keyword in para.getText().lower():
