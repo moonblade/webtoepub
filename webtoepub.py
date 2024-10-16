@@ -31,6 +31,9 @@ class Feeds:
         with open(os.path.join(scriptPath, "feed.input.json"), "r") as f:
             feeds = json.load(f)
             for feed in feeds:
+                if feed.get("ignore", False):
+                    # print(f"Ignoring {feed.get('name','')}")
+                    continue
                 convertor = WebToEpub(feed)
                 convertors.append(convertor)
                 convertor.convert()
