@@ -70,7 +70,12 @@ class WebToEpub:
         if ("royalroad" in url):
             cleanedHtml = cleanedHtml.find(".chapter-inner.chapter-content")[0]
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
-            for para in soup.find_all("p"):
+            chapter_div = soup.find("div", class_="chapter-inner chapter-content")
+            if not chapter_div:
+                print("Could not find the chapter content div")
+                return soup.prettify()
+            extracted = False
+            for para in chapter_div.find_all(["p", "div"]):
                 if para.getText().count(".") <= 3 and para.getText().count(" ") <= 25:
                     keywordsFound = 0
                     for keyword in keywordsToRemove:
@@ -79,6 +84,10 @@ class WebToEpub:
                     if keywordsFound >= 2:
                         print(f"{para.getText()} Extracted")
                         para.extract()
+                        extracted = True
+                        break
+            if not extracted:
+                print("Could not find any paragraphs")
                     # if keywordsFound == 0:
                     #     with open("/tmp/a.txt", "a") as f:
                     #         f.write(para.text)
@@ -110,6 +119,7 @@ class WebToEpub:
         htmlContent = self.clean(url, r.html)
         with open("/tmp/article.html", "w") as file:
             file.write(htmlContent)
+        # exit(0)
         subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '" --metadata lang="en-US" --css epub.css', shell=True, cwd=self.scriptPath)
         if (not args.dry_run):
             print("\nSending: ", title)
