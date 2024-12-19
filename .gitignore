@@ -3,3 +3,4 @@ completed.db
 .DS_Store
 cron.log
 completedObjects.db
+books

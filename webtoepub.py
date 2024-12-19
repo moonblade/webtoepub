@@ -9,10 +9,12 @@ from requests_html import HTMLSession
 import ssl
 import os
 import json
-import epub
+from ebooklib import epub
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 filename = os.path.join(script_dir, 'keywords.txt')
+DELAY_FOR_EPUB_CHAPTER = 86400
+DELAY_FOR_EPUB_CHAPTER = 1
 
 with open(filename, 'r') as file:
     KEYWORDS_TO_REMOVE = [line.strip() for line in file if line.strip()]
@@ -47,6 +49,8 @@ class WebToEpub:
         self.getData()
         ssl._create_default_https_context = ssl._create_unverified_context
         self.feed = None
+        self.file = None
+        self.name = None
         if "url" in feedObj:
             self.feed = feedparser.parse(feedObj["url"])
 
@@ -118,7 +122,7 @@ class WebToEpub:
     def convert(self):
         if self.file:
             last_completed = self.get_last_completed_timestamp()
-            if last_completed and (int(time.time()) - last_completed) > 86400:
+            if last_completed and (int(time.time()) - last_completed) > DELAY_FOR_EPUB_CHAPTER:
                 self.send_next_chapter()
         if not self.feed:
             return
