@@ -23,7 +23,7 @@ parser.add_argument('-i', '--remove-images', action='store_true')
 parser.add_argument('-l', '--link', default=None)
 args = parser.parse_args()
 
-scriptPath = os.path.dirname(os.path.abspath( __file__ ))
+scriptPath = os.path.dirname(os.path.abspath(__file__))
 
 class Feeds:
     def __init__(self):
@@ -40,34 +40,33 @@ class Feeds:
 
 
 class WebToEpub:
-    def __init__(self,feedObj):
-        self.completedUrls = set([])
+    def __init__(self, feedObj):
+        self.completedUrls = []  # List of objects with `link` and `date`
         self.scriptPath = "~"
         self.getData()
         ssl._create_default_https_context = ssl._create_unverified_context
         self.feed = None
-        if ("url" in feedObj):
+        if "url" in feedObj:
             self.feed = feedparser.parse(feedObj["url"])
 
     def convert(self):
         if not self.feed:
             return
         for entry in self.feed.entries[::-1]:
-            if entry.link not in self.completedUrls and "Patron Early Access:" not in entry.title:
+            if not any(obj["link"] == entry.link for obj in self.completedUrls) and "Patron Early Access:" not in entry.title:
                 try:
-                    self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                    self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "") + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
                 except:
                     try:
                         args.remove_images = True
-                        self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "")  + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
+                        self.epub(entry.link, ((self.feed.feed.title + " - ") if self.feed.feed.title not in entry.title else "") + time.strftime("%Y-%m-%d", entry.published_parsed) + " - " + entry.title)
                     except Exception as e:
                         print("Exception ", str(e))
-
 
     def clean(self, url, html):
         keywordsToRemove = KEYWORDS_TO_REMOVE
         cleanedHtml = html
-        if ("royalroad" in url):
+        if "royalroad" in url:
             cleanedHtml = cleanedHtml.find(".chapter-inner.chapter-content")[0]
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
             chapter_div = soup.find("div", class_="chapter-inner chapter-content")
@@ -88,13 +87,9 @@ class WebToEpub:
                         break
             if not extracted:
                 print("Could not find any paragraphs")
-                    # if keywordsFound == 0:
-                    #     with open("/tmp/a.txt", "a") as f:
-                    #         f.write(para.text)
-                    #         f.write("\n---\n\n\n")
             return soup.prettify()
 
-        if ("wanderinginn" in url):
+        if "wanderinginn" in url:
             cleanedHtml = cleanedHtml.find("article")[0]
             cleanedHtml = cleanedHtml.find(".entry-content")[0]
             soup = BeautifulSoup(str(cleanedHtml.html), features="lxml")
@@ -119,39 +114,38 @@ class WebToEpub:
         htmlContent = self.clean(url, r.html)
         with open("/tmp/article.html", "w") as file:
             file.write(htmlContent)
-        # exit(0)
-        subprocess.check_call('pandoc /tmp/article.html -o "output/' + title +  '.epub" --metadata title="' + title + '" --metadata lang="en-US" --css epub.css', shell=True, cwd=self.scriptPath)
-        if (not args.dry_run):
+        subprocess.check_call('pandoc /tmp/article.html -o "output/' + title + '.epub" --metadata title="' + title + '" --metadata lang="en-US" --css epub.css', shell=True, cwd=self.scriptPath)
+        if not args.dry_run:
             print("\nSending: ", title)
             subprocess.check_call('echo book | mutt -s "' + title + '" -a "output/' + title + '.epub" -- mnishamk95@kindle.com', shell=True, cwd=self.scriptPath)
         print("---")
-        if (not args.dry_run or args.update_db):
+        if not args.dry_run or args.update_db:
             self.complete(url)
 
     def complete(self, url):
-        self.completedUrls.add(url)
+        current_epoch_time = int(time.time())
+        self.completedUrls.append({"link": url, "date": current_epoch_time})
         self.saveData()
 
     def saveData(self):
-        with open(os.path.join(self.scriptPath, "completed.db"), "wb") as data:
+        with open(os.path.join(self.scriptPath, "completedObjects.db"), "wb") as data:
             pickle.dump(self.completedUrls, data)
 
     def getData(self):
-        self.scriptPath = os.path.dirname(os.path.abspath( __file__ ))
+        self.scriptPath = os.path.dirname(os.path.abspath(__file__))
         try:
-            with open(os.path.join(self.scriptPath, "completed.db"), "rb") as data:
+            with open(os.path.join(self.scriptPath, "completedObjects.db"), "rb") as data:
                 self.completedUrls = pickle.load(data)
         except Exception:
-            with open(os.path.join(self.scriptPath, "completed.db"), "wb") as data:
+            with open(os.path.join(self.scriptPath, "completedObjects.db"), "wb") as data:
                 pickle.dump(self.completedUrls, data)
 
 def removeLink():
-    with open(os.path.join(scriptPath, "completed.db"), "rb") as data:
+    with open(os.path.join(scriptPath, "completedObjects.db"), "rb") as data:
         completedUrls = pickle.load(data)
-    if args.link in completedUrls:
-        completedUrls.remove(args.link)
-    with open(os.path.join(scriptPath, "completed.db"), "wb") as data:
-        pickle.dump(completedUrls, data)
+    updatedUrls = [obj for obj in completedUrls if obj["link"] != args.link]
+    with open(os.path.join(scriptPath, "completedObjects.db"), "wb") as data:
+        pickle.dump(updatedUrls, data)
 
 def main():
     if args.link:
@@ -162,3 +156,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
