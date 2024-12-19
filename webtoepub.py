@@ -9,6 +9,7 @@ from requests_html import HTMLSession
 import ssl
 import os
 import json
+import epub
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 filename = os.path.join(script_dir, 'keywords.txt')
@@ -62,7 +63,57 @@ class WebToEpub:
         return last_completed["date"]
 
     def send_next_chapter(self):
-        pass
+        if not self.file:
+            print("No file provided for this feed. Cannot send chapters.")
+            return
+
+        # Find the last sent chapter from `completedObjects.db`
+        last_chapter = 0
+        for entry in self.completedUrls:
+            if entry["link"].startswith(f"chapter:{self.name}:"):
+                chapter_num = int(entry["link"].split(":")[-1])
+                last_chapter = max(last_chapter, chapter_num)
+
+        next_chapter = last_chapter + 1
+
+        # Read the EPUB file
+        book = epub.read_epub(self.file)
+        chapters = [item for item in book.items if isinstance(item, epub.EpubHtml)]
+
+        if next_chapter > len(chapters):
+            print(f"No more chapters to send for {self.name}.")
+            return
+
+        # Extract the next chapter
+        chapter = chapters[next_chapter - 1]  # EPUB chapters are 0-indexed
+
+        # Create a new EPUB with the single chapter
+        new_book = epub.EpubBook()
+        new_book.set_title(f"{self.name} - Chapter {next_chapter}")
+        new_book.set_language("en")
+        new_book.add_author("Unknown")
+        new_book.add_item(chapter)
+        new_book.spine = [chapter]
+
+        output_file = f"/tmp/{self.name.replace(' ', '_')}_Chapter_{next_chapter}.epub"
+        epub.write_epub(output_file, new_book)
+
+        # Send the chapter using mutt
+        print(f"\nSending Chapter {next_chapter}: {self.name}")
+        subprocess.check_call(
+            f'echo book | mutt -s "{self.name} - Chapter {next_chapter}" -a "{output_file}" -- mnishamk95@kindle.com',
+            shell=True,
+            cwd=self.scriptPath,
+        )
+
+        # Add the sent chapter to `completedObjects.db`
+        self.completedUrls.append({
+            "link": f"chapter:{self.name}:{next_chapter}",
+            "date": int(time.time()),
+        })
+        self.saveData()
+
+        print(f"Chapter {next_chapter} sent and added to completedObjects.db.")
 
     def convert(self):
         if self.file:
