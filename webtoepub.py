@@ -49,7 +49,26 @@ class WebToEpub:
         if "url" in feedObj:
             self.feed = feedparser.parse(feedObj["url"])
 
+        if "name" in feedObj:
+            self.name = feedObj["name"]
+        
+        if "file" in feedObj:
+            self.file = feedObj["file"]
+
+    def get_last_completed_timestamp(self):
+        if not self.completedUrls:
+            return None
+        last_completed = max(self.completedUrls, key=lambda x: x["date"])
+        return last_completed["date"]
+
+    def send_next_chapter(self):
+        pass
+
     def convert(self):
+        if self.file:
+            last_completed = self.get_last_completed_timestamp()
+            if last_completed and (int(time.time()) - last_completed) > 86400:
+                self.send_next_chapter()
         if not self.feed:
             return
         for entry in self.feed.entries[::-1]:
