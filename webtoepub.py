@@ -13,7 +13,7 @@ from ebooklib import epub
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 filename = os.path.join(script_dir, 'keywords.txt')
-DELAY_FOR_EPUB_CHAPTER = 86400
+DELAY_FOR_EPUB_CHAPTER = 86400 * 1.75
 # DELAY_FOR_EPUB_CHAPTER = 1
 
 with open(filename, 'r') as file:
