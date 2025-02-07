@@ -4,3 +4,4 @@ completed.db
 cron.log
 completedObjects.db
 books
+__pycache__
