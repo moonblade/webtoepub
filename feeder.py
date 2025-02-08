@@ -1,5 +1,6 @@
 import json
 import os
+from time import time
 from typing import List
 from db import add_entry, has_entry
 from models import Entry, EntryType, Feed, FeedItem
@@ -10,11 +11,13 @@ from bs4 import BeautifulSoup
 from utils import custom_logger
 from mail import send_gmail
 import pypandoc
+import re
 
 FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/-ZyX3mJU")
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/tmp/feeds")
 CSS_PATH = os.getenv("CSS_PATH", "./epub.css")
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
 logger = custom_logger(__name__)
 
 with open("./keywords.txt", 'r') as file:
@@ -175,6 +178,7 @@ def send_email(entry: Entry, feed: FeedItem):
             content=f"EPUB file for {entry.title} is attached.",
             attachment_path=epub_file_path
         )
+    entry.time_sent = int(time())
     add_entry(entry, feed)
 
 def process_entry(entry: Entry, feed: FeedItem):
@@ -182,8 +186,12 @@ def process_entry(entry: Entry, feed: FeedItem):
     Processes a single entry in a feed.
     """
     try:
+        feed.title = re.sub(r"\[.*?\]", "", feed.title)
+        feed.title = feed.title.strip()
+        entry.title = re.sub(r"\[.*?\]", "", entry.title)
+        entry.title = entry.title.strip()
         if WANDERING_INN_URL_FRAGMENT in entry.link:
-            entry.entryType = "wanderinginn"
+            entry.entryType = EntryType.wanderinginn
             entry.title = feed.title + " - " + entry.title
             if entry.ignore():
                 logger.info(f"Ignoring entry: {entry.title}")
@@ -209,7 +217,7 @@ def process_feed_item(feed: FeedItem):
         feed_data = feedparser.parse(feed.url)
         feed.title = feed_data.feed.get("title", "")
         entries = feed_data.get("entries", [])
-        for entry in entries[:2]:
+        for entry in entries:
             try:
                 entry = Entry(**entry)
                 process_entry(entry, feed)
@@ -222,7 +230,9 @@ def process_feed(feed: Feed):
     """
     Processes the entire feed.
     """
-    for feed_item in feed.feeds[:2]:
+    if DEBUG_MODE:
+        feed.feeds = feed.feeds[:2]
+    for feed_item in feed.feeds:
         feed_item.dry_run = feed.dry_run
         process_feed_item(feed_item)
 

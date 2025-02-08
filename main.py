@@ -1,4 +1,5 @@
 import logging
+from db import get_entries
 from fastapi import FastAPI
 from datetime import datetime
 from utils import custom_logger
@@ -20,6 +21,14 @@ async def get_status():
 async def _execute():
     execute()
     return "ok"
+
+@app.get("/sent_items")
+async def get_sent_items():
+    """
+    Returns a list of items that have been sent.
+    """
+    return get_entries()
+
 
 # For running the app locally (for development)
 if __name__ == "__main__":
