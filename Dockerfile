@@ -31,6 +31,7 @@ COPY mail.py .
 COPY main.py .
 COPY models.py .
 COPY utils.py .
+COPY templates/ templates/
 
 # Expose the port the app runs on
 EXPOSE 9000

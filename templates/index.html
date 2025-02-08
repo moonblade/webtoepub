@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sent Items</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mui/3.7.1/css/mui.min.css">
+    <style>
+        :root {
+            --background: #121212;
+            --surface: #1e1e1e;
+            --primary: #bb86fc;
+            --text: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .items-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .item-card {
+            background-color: var(--surface);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            padding: 20px;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+        }
+
+        .item-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .item-title {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            text-decoration: none;
+        }
+
+        .item-title:hover {
+            text-decoration: underline;
+        }
+
+        .item-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .item-card {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Sent Items</h1>
+        </div>
+        <ul class="items-list">
+            {% for item in sent_items %}
+            <li>
+                <a href="{{ item.link }}" target="_blank" style="text-decoration: none;">
+                    <div class="item-card">
+                        <div class="item-title">{{ item.title }}</div>
+                        <div class="item-meta">
+                            Sent on: <span class="timestamp" data-time="{{ item.time_sent }}"></span>
+                        </div>
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <script>
+        // Format timestamps when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const timestamps = document.querySelectorAll('.timestamp');
+            timestamps.forEach(span => {
+                const timestamp = parseInt(span.dataset.time);
+                const date = new Date(timestamp * 1000); // Convert to milliseconds
+                span.textContent = date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

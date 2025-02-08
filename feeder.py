@@ -231,6 +231,7 @@ def process_feed(feed: Feed):
     """
     if DEBUG_MODE:
         feed.feeds = feed.feeds[:2]
+        feed.dry_run = True
     for feed_item in feed.feeds:
         if feed.dry_run:
             feed_item.dry_run = feed.dry_run
