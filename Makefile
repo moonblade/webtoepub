@@ -21,3 +21,6 @@ requirements:
 
 freeze:
 	source venv/bin/activate && pip freeze
+
+build:
+	docker build -t feeder .

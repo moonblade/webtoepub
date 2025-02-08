@@ -2,7 +2,7 @@ import os
 from models import Entry, FeedItem
 from tinydb import TinyDB, Query
 
-DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/tmp/feeds")
+DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 db = TinyDB(os.path.join(DOWNLOAD_PATH, 'db.json'))
 
 def add_entry(entry: Entry, feed: FeedItem):
