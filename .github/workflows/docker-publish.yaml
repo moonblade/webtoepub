@@ -11,6 +11,10 @@ on:
 
 jobs:
   build-and-push:
+    permissions:
+      contents: read
+      packages: write
+
     runs-on: ubuntu-latest
 
     steps:
@@ -40,4 +44,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: ghcr.io/${{ github.repository }}:${{ env.SHORT_SHA }}
+        tags: ghcr.io/${{ github.repository_owner }}/feeder:${{ env.SHORT_SHA }}
