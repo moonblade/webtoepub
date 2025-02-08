@@ -18,7 +18,6 @@ logger = custom_logger(__name__)
 with open("./keywords.txt", 'r') as file:
     KEYWORDS_TO_REMOVE = [line.strip() for line in file if line.strip()]
 
-
 def get_feed_list() -> List[FeedItem]:
     """
     Retrieves a list of feed items from a given URL, parses the JSON response,
