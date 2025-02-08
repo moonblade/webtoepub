@@ -232,7 +232,8 @@ def process_feed(feed: Feed):
     if DEBUG_MODE:
         feed.feeds = feed.feeds[:2]
     for feed_item in feed.feeds:
-        feed_item.dry_run = feed.dry_run
+        if feed.dry_run:
+            feed_item.dry_run = feed.dry_run
         process_feed_item(feed_item)
 
 def execute():
