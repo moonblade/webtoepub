@@ -1,12 +1,14 @@
 import json
 import os
 from typing import List
-from models import Entry, EntryType, FeedItem
+from db import add_entry, has_entry
+from models import Entry, EntryType, Feed, FeedItem
 import feedparser
 import requests
 from requests_html import HTMLSession
 from bs4 import BeautifulSoup
 from utils import custom_logger
+from mail import send_gmail
 import pypandoc
 
 FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/-ZyX3mJU")
@@ -26,16 +28,8 @@ def get_feed_list() -> List[FeedItem]:
     response = requests.get(FEEDURL)
     response.raise_for_status()
     data = response.json()
-
-    feed_list: List[FeedItem] = []
-    for item in data:
-        try:
-            feed_item = FeedItem(**item)
-            feed_list.append(feed_item)
-        except Exception as e:
-            logger.exception(f"Error creating FeedItem from: {item}. Error: {e}")
-            continue
-    return feed_list
+    feed = Feed(**data)
+    return feed
 
 def download(entry: Entry, feed: FeedItem):
     """
@@ -48,9 +42,9 @@ def download(entry: Entry, feed: FeedItem):
     html_file_path = os.path.join(html_download_path, f"{entry.title}.html")
     if os.path.exists(html_file_path):
         return
-    logger.info(f"Downloading content from {entry.get_link()} to {html_file_path}")
+    logger.info(f"Downloading content from {entry.link} to {html_file_path}")
     session = HTMLSession()
-    response = session.get(entry.get_link())
+    response = session.get(entry.link)
     response.raise_for_status()
     with open(html_file_path, "w") as f:
         f.write(response.html.html)
@@ -161,12 +155,34 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     os.rename(epub_file_path_no_space, epub_file_path)
     logger.info(f"EPUB file saved to {epub_file_path}")
 
+def send_email(entry: Entry, feed: FeedItem):
+    """
+    Sends an email with the EPUB file attached.
+    """
+    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    epub_file_path = os.path.join(feed_path, f"{entry.title}.epub")
+    if not os.path.exists(epub_file_path):
+        logger.error(f"EPUB file not found: {epub_file_path}")
+        return
+    if has_entry(entry):
+        return
+    if feed.dry_run:
+        logger.info(f"DRY RUN: Would have sent email with EPUB file: {epub_file_path}")
+    else:
+        logger.info(f"Sending email with EPUB file: {epub_file_path}")
+        send_gmail(
+            subject=f"{feed.title} - {entry.title}",
+            content=f"EPUB file for {entry.title} is attached.",
+            attachment_path=epub_file_path
+        )
+    add_entry(entry, feed)
+
 def process_entry(entry: Entry, feed: FeedItem):
     """
     Processes a single entry in a feed.
     """
     try:
-        if WANDERING_INN_URL_FRAGMENT in entry.get_link():
+        if WANDERING_INN_URL_FRAGMENT in entry.link:
             entry.entryType = "wanderinginn"
             entry.title = feed.title + " - " + entry.title
             if entry.ignore():
@@ -176,11 +192,12 @@ def process_entry(entry: Entry, feed: FeedItem):
         download(entry, feed)
         clean(entry, feed)
         convert_to_epub(entry, feed)
+        send_email(entry, feed)
 
     except Exception as e:
         logger.exception(f"Error processing entry: {e}")
 
-def process_feed(feed: FeedItem):
+def process_feed_item(feed: FeedItem):
     """
     Processes a single feed item.
     """
@@ -189,7 +206,7 @@ def process_feed(feed: FeedItem):
             logger.warn(f"Ignoring feed: {feed.name}")
             return
         logger.info(f"Processing feed - {feed.name}")
-        feed_data = feedparser.parse(feed.get_url())
+        feed_data = feedparser.parse(feed.url)
         feed.title = feed_data.feed.get("title", "")
         entries = feed_data.get("entries", [])
         for entry in entries[:2]:
@@ -201,7 +218,14 @@ def process_feed(feed: FeedItem):
     except Exception as e:
         logger.exception(f"Error processing feed {feed.name}: {e}")
 
+def process_feed(feed: Feed):
+    """
+    Processes the entire feed.
+    """
+    for feed_item in feed.feeds[:2]:
+        feed_item.dry_run = feed.dry_run
+        process_feed_item(feed_item)
+
 def execute():
-    feed_list = get_feed_list()
-    for feed in feed_list[:2]:
-        process_feed(feed)
+    feed = get_feed_list()
+    process_feed(feed)
