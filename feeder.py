@@ -15,8 +15,7 @@ import re
 
 FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/-ZyX3mJU")
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
-DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/tmp/feeds")
-CSS_PATH = os.getenv("CSS_PATH", "./epub.css")
+DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
 logger = custom_logger(__name__)
 
@@ -146,7 +145,7 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     extra_args = [
         '--metadata', f'title={entry.title}',
         '--metadata', 'lang=en-US',
-        '--css', CSS_PATH
+        '--css', "./epub.css"
     ]
 
     pypandoc.convert_file(
