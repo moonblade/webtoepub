@@ -30,3 +30,6 @@ class Entry(BaseModel):
 
     def ignore(self) -> bool:
         return "Patron Early Access:" in self.title
+
+    def get_file_name(self) -> str:
+        return self.title.replace(" ", "_")

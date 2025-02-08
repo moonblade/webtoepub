@@ -7,11 +7,12 @@ import requests
 from requests_html import HTMLSession
 from bs4 import BeautifulSoup
 from utils import custom_logger
-
+import pypandoc
 
 FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/-ZyX3mJU")
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/tmp/feeds")
+CSS_PATH = os.getenv("CSS_PATH", "./epub.css")
 logger = custom_logger(__name__)
 
 with open("./keywords.txt", 'r') as file:
@@ -41,12 +42,10 @@ def download(entry: Entry, feed: FeedItem):
     """
     Downloads the content of an entry to disk.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.name)
-    if not os.path.exists(feed_path):
-        os.makedirs(feed_path, exist_ok=True)
+    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
     html_download_path = os.path.join(feed_path, "html")
-    if not os.path.exists(html_download_path):
-        os.makedirs(html_download_path, exist_ok=True)
+    os.makedirs(feed_path, exist_ok=True)
+    os.makedirs(html_download_path, exist_ok=True)
     html_file_path = os.path.join(html_download_path, f"{entry.title}.html")
     if os.path.exists(html_file_path):
         return
@@ -115,31 +114,53 @@ def clean(entry: Entry, feed: FeedItem):
     """
     Cleans the downloaded content of an entry.
     """
-    try:
-        feed_path = os.path.join(DOWNLOAD_PATH, feed.name)
-        html_download_path = os.path.join(feed_path, "html")
-        html_file_path = os.path.join(html_download_path, f"{entry.title}.html")
-        cleaned_download_path = os.path.join(feed_path, "cleaned")
-        if os.path.exists(cleaned_download_path):
-            return
-        logger.info(f"Cleaning content from {html_file_path}")
-        with open(html_file_path, "r") as f:
-            html_content = f.read()
-        if entry.entryType == EntryType.wanderinginn:
-            cleaned_html = clean_wandering_inn(html_content)
-        elif entry.entryType == EntryType.royalroad:
-            cleaned_html = clean_royal_road(html_content, KEYWORDS_TO_REMOVE)
-        else:
-            cleaned_html = html_content
-        if not os.path.exists(cleaned_download_path):
-            os.makedirs(cleaned_download_path, exist_ok=True)
-        cleaned_file_path = os.path.join(cleaned_download_path, f"{entry.title}.html")
-        with open(cleaned_file_path, "w") as f:
-            f.write(cleaned_html)
-        logger.info(f"Cleaned content saved to {cleaned_file_path}")
-    except Exception as e:
-        logger.exception(f"An unexpected error occurred: {e}")
+    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    html_download_path = os.path.join(feed_path, "html")
+    html_file_path = os.path.join(html_download_path, f"{entry.title}.html")
+    cleaned_download_path = os.path.join(feed_path, "cleaned")
+    cleaned_file_path = os.path.join(cleaned_download_path, f"{entry.title}.html")
+    os.makedirs(cleaned_download_path, exist_ok=True)
+    if os.path.exists(cleaned_file_path):
+        return
+    logger.info(f"Cleaning content from {html_file_path}")
+    with open(html_file_path, "r") as f:
+        html_content = f.read()
+    if entry.entryType == EntryType.wanderinginn:
+        cleaned_html = clean_wandering_inn(html_content)
+    elif entry.entryType == EntryType.royalroad:
+        cleaned_html = clean_royal_road(html_content, KEYWORDS_TO_REMOVE)
+    else:
+        cleaned_html = html_content
+    with open(cleaned_file_path, "w") as f:
+        f.write(cleaned_html)
+    logger.info(f"Cleaned content saved to {cleaned_file_path}")
 
+def convert_to_epub(entry: Entry, feed: FeedItem):
+    """
+    Converts the cleaned content of an entry to an EPUB file.
+    """
+    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    cleaned_html_path = os.path.join(feed_path, "cleaned", f"{entry.title}.html")
+    epub_file_path_no_space = os.path.join(feed_path, f"{entry.get_file_name()}.epub")
+    epub_file_path = os.path.join(feed_path, f"{entry.title}.epub")
+    if os.path.exists(epub_file_path):
+        return
+    logger.info(f"Converting cleaned content from {cleaned_html_path} to EPUB")
+
+    extra_args = [
+        '--metadata', f'title={entry.title}',
+        '--metadata', 'lang=en-US',
+        '--css', CSS_PATH
+    ]
+
+    pypandoc.convert_file(
+        cleaned_html_path,
+        'epub',
+        outputfile=epub_file_path_no_space,
+        extra_args=extra_args
+    )
+    os.rename(epub_file_path_no_space, epub_file_path)
+    logger.info(f"EPUB file saved to {epub_file_path}")
 
 def process_entry(entry: Entry, feed: FeedItem):
     """
@@ -155,6 +176,7 @@ def process_entry(entry: Entry, feed: FeedItem):
         entry.title = entry.get_date() + " - " + entry.title
         download(entry, feed)
         clean(entry, feed)
+        convert_to_epub(entry, feed)
 
     except Exception as e:
         logger.exception(f"Error processing entry: {e}")

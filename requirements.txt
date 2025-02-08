@@ -7,3 +7,4 @@ bs4==0.0.2
 EbookLib==0.18
 uvicorn==0.34.0
 fastapi==0.115.8
+pypandoc_binary==1.15
