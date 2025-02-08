@@ -9,7 +9,6 @@ class FeedItem(BaseModel):
     url: str
     ignore: Optional[bool] = False
     dry_run: Optional[bool] = False
-    time_sent: Optional[int] = 0
 
 class Feed(BaseModel):
     feeds: list[FeedItem]
@@ -24,6 +23,7 @@ class Entry(BaseModel):
     link: str
     entryType: EntryType = EntryType.royalroad
     published_parsed: tuple
+    time_sent: Optional[int] = 0
 
     def get_date(self) -> str:
         return time.strftime("%Y-%m-%d", self.published_parsed)
