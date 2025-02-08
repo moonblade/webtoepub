@@ -1,6 +1,8 @@
+import logging
 from fastapi import FastAPI
 from datetime import datetime
-
+from utils import custom_logger
+import uvicorn
 from feeder import execute
 
 app = FastAPI()
@@ -21,7 +23,6 @@ async def _execute():
 
 # For running the app locally (for development)
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=9000, reload=True)
 
 # https://browse.sirius.moonblade.work/api/public/dl/-ZyX3mJU

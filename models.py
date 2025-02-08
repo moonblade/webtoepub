@@ -27,3 +27,6 @@ class Entry(BaseModel):
 
     def get_date(self) -> str:
         return time.strftime("%Y-%m-%d", self.published_parsed)
+
+    def ignore(self) -> bool:
+        return "Patron Early Access:" in self.title
