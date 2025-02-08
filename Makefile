@@ -1,6 +1,8 @@
 SENDER_EMAIL:=$(shell cat secrets/mailconfig.json | jq -r '.sender_email')
 APP_PASSWORD:=$(shell cat secrets/mailconfig.json | jq -r '.app_password')
 TO_EMAIL:=$(shell cat secrets/mailconfig.json | jq -r '.to_email')
+DOWNLOAD_PATH:=/tmp/feeds
+UPDATE_FREQUENCY_SECONDS:=600
 # DEBUG_MODE:=true
 .EXPORT_ALL_VARIABLES:
 
