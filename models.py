@@ -6,11 +6,14 @@ import time
 class FeedItem(BaseModel):
     title: str = ""
     name: str
-    url: HttpUrl
+    url: str
     ignore: Optional[bool] = False
+    dry_run: Optional[bool] = False
+    time_sent: Optional[int] = 0
 
-    def get_url(self) -> str:
-        return str(self.url)
+class Feed(BaseModel):
+    feeds: list[FeedItem]
+    dry_run: bool = False
 
 class EntryType(str, Enum):
     wanderinginn = "wanderinginn"
@@ -18,12 +21,9 @@ class EntryType(str, Enum):
 
 class Entry(BaseModel):
     title: str
-    link: HttpUrl
+    link: str
     entryType: EntryType = EntryType.royalroad
     published_parsed: tuple
-
-    def get_link(self) -> str:
-        return str(self.link)
 
     def get_date(self) -> str:
         return time.strftime("%Y-%m-%d", self.published_parsed)

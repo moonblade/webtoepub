@@ -2,9 +2,9 @@ feedparser==6.0.11
 requests-html==0.10.0
 pydantic==2.10.6
 lxml_html_clean==0.4.1
-argparse
 bs4==0.0.2
 EbookLib==0.18
 uvicorn==0.34.0
 fastapi==0.115.8
 pypandoc_binary==1.15
+tinydb==4.8.2
