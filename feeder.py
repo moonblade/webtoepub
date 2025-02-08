@@ -210,9 +210,9 @@ def process_feed_item(feed: FeedItem):
     """
     try:
         if feed.ignore:
-            logger.warn(f"Ignoring feed: {feed.name}")
+            logger.debug(f"Ignoring feed: {feed.name}")
             return
-        logger.info(f"Processing feed - {feed.name}")
+        logger.debug(f"Processing feed - {feed.name}")
         feed_data = feedparser.parse(feed.url)
         feed.title = feed_data.feed.get("title", "")
         entries = feed_data.get("entries", [])
@@ -236,5 +236,6 @@ def process_feed(feed: Feed):
         process_feed_item(feed_item)
 
 def execute():
+    logger.info("Feed processing started.")
     feed = get_feed_list()
     process_feed(feed)
