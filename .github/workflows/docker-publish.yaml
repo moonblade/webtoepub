@@ -38,7 +38,7 @@ jobs:
     # Build the Docker image
     - name: Build Docker image
       run: |
-        docker build -t ghcr.io/${{ github.repository_owner }}/feeder:${{ env.SHORT_SHA }} app/
+        docker build -t ghcr.io/${{ github.repository_owner }}/feeder:${{ env.SHORT_SHA }} .
 
     - name: Push Docker image
       run: |
