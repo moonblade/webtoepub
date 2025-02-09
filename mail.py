@@ -19,6 +19,8 @@ def send_gmail(
     app_password: str = APP_PASSWORD,
     to_email: str = TO_EMAIL
 ) -> bool:
+    print("NOOOOO")
+    return True
     """
     Send an email with optional attachment using Gmail SMTP server.
     
