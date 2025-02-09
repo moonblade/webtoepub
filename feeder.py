@@ -158,7 +158,7 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     os.rename(epub_file_path_no_space, epub_file_path)
     logger.info(f"EPUB file saved to {epub_file_path}")
 
-def prepare_email(entry: Entry, feed: FeedItem) -> EmailBatch | None:
+def prepare_email(entry: Entry, feed: FeedItem):
     """
     Prepares an email for sending by validating the EPUB file exists and entry hasn't been sent.
     Returns None if the email shouldn't be sent.
