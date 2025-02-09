@@ -33,3 +33,8 @@ class Entry(BaseModel):
 
     def get_file_name(self) -> str:
         return self.title.replace(" ", "_")
+
+class EmailBatch(BaseModel):
+    entry: Entry
+    feed: FeedItem
+    epub_path: str

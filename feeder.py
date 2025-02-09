@@ -3,7 +3,7 @@ import os
 from time import time
 from typing import List
 from db import add_entry, has_entry
-from models import Entry, EntryType, Feed, FeedItem
+from models import EmailBatch, Entry, EntryType, Feed, FeedItem
 import feedparser
 import requests
 from requests_html import HTMLSession
@@ -17,6 +17,7 @@ FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
+MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "10"))
 logger = custom_logger(__name__)
 
 with open("./keywords.txt", 'r') as file:
@@ -157,6 +158,52 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     os.rename(epub_file_path_no_space, epub_file_path)
     logger.info(f"EPUB file saved to {epub_file_path}")
 
+def prepare_email(entry: Entry, feed: FeedItem) -> EmailBatch | None:
+    """
+    Prepares an email for sending by validating the EPUB file exists and entry hasn't been sent.
+    Returns None if the email shouldn't be sent.
+    """
+    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    epub_file_path = os.path.join(feed_path, f"{entry.title}.epub")
+    
+    if not os.path.exists(epub_file_path):
+        logger.error(f"EPUB file not found: {epub_file_path}")
+        return None
+    if has_entry(entry):
+        return None
+    return EmailBatch(entry=entry, feed=feed, epub_path=epub_file_path)
+
+def send_batch_emails(email_batch: List[EmailBatch], feed: Feed):
+    """
+    Sends all emails in the batch and records them in the database.
+    """
+
+    if len(email_batch) > MAX_BATCH_SIZE:
+        logger.error(f"Email batch size ({len(email_batch)}) exceeds maximum allowed ({MAX_BATCH_SIZE}). No emails will be sent.")
+        for batch in email_batch:
+            add_entry(batch.entry, batch.feed)
+        return
+
+    if len(email_batch) == 0:
+        return
+
+    logger.info(f"Preparing to send {len(email_batch)} emails")
+    
+    if feed.dry_run:
+        for batch in email_batch:
+            logger.info(f"DRY RUN: Would have sent email with EPUB file: {batch.epub_path}")
+            add_entry(batch.entry, batch.feed)
+    else:
+        for batch in email_batch:
+            logger.info(f"Sending email with EPUB file: {batch.epub_path}")
+            send_gmail(
+                subject=f"{batch.feed.title} - {batch.entry.title}",
+                content=f"EPUB file for {batch.entry.title} is attached.",
+                attachment_path=batch.epub_path
+            )
+            batch.entry.time_sent = int(time())
+            add_entry(batch.entry, batch.feed)
+
 def send_email(entry: Entry, feed: FeedItem):
     """
     Sends an email with the EPUB file attached.
@@ -199,7 +246,7 @@ def process_entry(entry: Entry, feed: FeedItem):
         download(entry, feed)
         clean(entry, feed)
         convert_to_epub(entry, feed)
-        send_email(entry, feed)
+        return prepare_email(entry, feed)
 
     except Exception as e:
         logger.exception(f"Error processing entry: {e}")
@@ -208,10 +255,12 @@ def process_feed_item(feed: FeedItem):
     """
     Processes a single feed item.
     """
+    email_batch = []
     try:
         if feed.ignore:
             logger.debug(f"Ignoring feed: {feed.name}")
-            return
+            return email_batch
+
         logger.debug(f"Processing feed - {feed.name}")
         feed_data = feedparser.parse(feed.url)
         feed.title = feed_data.feed.get("title", "")
@@ -219,11 +268,14 @@ def process_feed_item(feed: FeedItem):
         for entry in entries:
             try:
                 entry = Entry(**entry)
-                process_entry(entry, feed)
+                batch = process_entry(entry, feed)
+                if batch:
+                    email_batch.append(batch)
             except Exception as e:
                 logger.exception(f"Error processing entry: {e}")
     except Exception as e:
         logger.exception(f"Error processing feed {feed.name}: {e}")
+    return email_batch
 
 def process_feed(feed: Feed):
     """
@@ -232,10 +284,13 @@ def process_feed(feed: Feed):
     if DEBUG_MODE:
         feed.feeds = feed.feeds[:2]
         feed.dry_run = True
+    all_email_batches = []
     for feed_item in feed.feeds:
         if feed.dry_run:
             feed_item.dry_run = feed.dry_run
-        process_feed_item(feed_item)
+        email_batches = process_feed_item(feed_item)
+        all_email_batches.extend(email_batches)
+    send_batch_emails(all_email_batches, feed)
 
 def execute():
     logger.info("Feed processing started.")
