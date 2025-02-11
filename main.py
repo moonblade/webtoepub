@@ -61,10 +61,10 @@ async def get_sent_items():
     """
     return get_entries()
 
-@app.on_event("startup")
-async def startup_event():
-    if not DEBUG_MODE:
-        asyncio.create_task(run_periodic_updates())
+# @app.on_event("startup")
+# async def startup_event():
+#     if not DEBUG_MODE:
+#         asyncio.create_task(run_periodic_updates())
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=9000, reload=True)
