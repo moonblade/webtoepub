@@ -17,7 +17,7 @@ FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
-MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "10"))
+MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "20"))
 logger = custom_logger(__name__)
 
 with open("./keywords.txt", 'r') as file:
@@ -181,7 +181,8 @@ def send_batch_emails(email_batch: List[EmailBatch], feed: Feed):
     if len(email_batch) > MAX_BATCH_SIZE:
         logger.error(f"Email batch size ({len(email_batch)}) exceeds maximum allowed ({MAX_BATCH_SIZE}). No emails will be sent.")
         for batch in email_batch:
-            add_entry(batch.entry, batch.feed)
+            if batch.feed.dry_run:
+                add_entry(batch.entry, batch.feed)
         return
 
     if len(email_batch) == 0:
