@@ -294,6 +294,11 @@ def process_feed(feed: Feed):
     send_batch_emails(all_email_batches, feed)
 
 def execute():
+    # check to see if file system is mounted
+    test_file = os.getenv("TEST_FILE", "" )
+    if test_file and not os.path.exists(test_file):
+        logger.error(f"Test file not found: {test_file}")
+        return
     logger.info("Feed processing started.")
     feed = get_feed_list()
     process_feed(feed)
