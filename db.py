@@ -18,7 +18,8 @@ def has_entry(entry: Entry) -> bool:
     Checks if an entry exists in the database.
     """
     Entry = Query()
-    return db.contains((Entry.title == entry.title) & (Entry.link == entry.link))
+    return db.contains((Entry.link == entry.link))
+    # return db.contains((Entry.title == entry.title) & (Entry.link == entry.link))
 
 def get_entries() -> list[Entry]:
     """
