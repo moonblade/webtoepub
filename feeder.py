@@ -13,7 +13,7 @@ from mail import send_gmail
 import pypandoc
 import re
 
-FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/-ZyX3mJU")
+FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/hf_Ov0yq")
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
@@ -28,11 +28,18 @@ def get_feed_list() -> List[FeedItem]:
     Retrieves a list of feed items from a given URL, parses the JSON response,
     and returns a list of Pydantic FeedItem objects.
     """
-    response = requests.get(FEEDURL)
-    response.raise_for_status()
-    data = response.json()
-    feed = Feed(**data)
-    return feed
+    try:
+        response = requests.get(FEEDURL)
+        response.raise_for_status()
+        data = response.json()
+        feed = Feed(**data)
+        return feed
+    except requests.RequestException as e:
+        logger.warn("Returning local feed due to error fetching remote feed.")
+        with open("./feed.input.json", 'r') as file:
+            data = json.load(file)
+            feed = Feed(**data)
+            return feed
 
 def download(entry: Entry, feed: FeedItem):
     """
