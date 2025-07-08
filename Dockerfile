@@ -26,6 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY db.py .
 COPY epub.css .
 COPY feeder.py .
+COPY feed.input.json .
 COPY keywords.txt .
 COPY mail.py .
 COPY main.py .

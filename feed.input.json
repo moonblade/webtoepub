@@ -1,59 +1,76 @@
-[
-  {
-    "name": "The wandering inn",
-    "url": "https://wanderinginn.com/feed/"
-  },
-  {
-    "name": "He who fights with monsters",
-    "url": "https://www.royalroad.com/fiction/syndication/26294"
-  },
-  {
-    "name": "Paranoid Mage",
-    "url": "https://www.royalroad.com/fiction/syndication/49879"
-  },
-  {
-    "name": "Beware of chicken",
-    "url": "https://www.royalroad.com/fiction/syndication/39408"
-  },
-  {
-    "name": "Magic is programming",
-    "url": "https://www.royalroad.com/fiction/syndication/69938"
-  },
-  {
-    "name": "Zenith of sorcery",
-    "ignore": true,
-    "url": "https://www.royalroad.com/fiction/syndication/71045"
-  },
-  {
-    "name": "Mark of the Fool",
-    "url": "https://www.royalroad.com/fiction/syndication/41618"
-  },
-  {
-    "name": "Path of ascension",
-    "url": "https://www.royalroad.com/fiction/syndication/40920"
-  },
-  {
-    "name": "Super supportive",
-    "url": "https://www.royalroad.com/fiction/syndication/63759"
-  },
-  {
-    "name": "Return of the runebound professor",
-    "url": "https://www.royalroad.com/fiction/syndication/68679"
-  },
-  {
-    "name": "heretical fishing",
-    "url": "https://www.royalroad.com/fiction/syndication/67114"
-  },
-  {
-    "name": "The Stubborn Skill-Grinder In A Time Loop",
-    "url": "https://www.royalroad.com/fiction/syndication/83294"
-  },
-  {
-    "name": "TeeKay",
-    "url": "https://www.royalroad.com/fiction/syndication/97639"
-  },
-  {
-    "name": "Book of the dead",
-    "url": "https://www.royalroad.com/fiction/syndication/47038"
-  }
-]
+{
+  "dry_run": false,
+  "feeds": [
+      {
+        "name": "The wandering inn",
+        "url": "https://wanderinginn.com/feed/"
+      },
+      {
+        "name": "He who fights with monsters",
+        "url": "https://www.royalroad.com/fiction/syndication/26294"
+      },
+      {
+        "name": "Paranoid Mage",
+        "ignore": true,
+        "url": "https://www.royalroad.com/fiction/syndication/49879"
+      },
+      {
+        "name": "Beware of chicken",
+        "url": "https://www.royalroad.com/fiction/syndication/39408"
+      },
+      {
+        "name": "Magic is programming",
+        "url": "https://www.royalroad.com/fiction/syndication/69938"
+      },
+      {
+        "name": "Zenith of sorcery",
+        "ignore": true,
+        "url": "https://www.royalroad.com/fiction/syndication/71045"
+      },
+      {
+        "name": "Mark of the Fool",
+        "ignore": true,
+        "url": "https://www.royalroad.com/fiction/syndication/41618"
+      },
+      {
+        "name": "Path of ascension",
+        "url": "https://www.royalroad.com/fiction/syndication/40920"
+      },
+      {
+        "name": "Super supportive",
+        "url": "https://www.royalroad.com/fiction/syndication/63759"
+      },
+      {
+        "name": "Return of the runebound professor",
+        "url": "https://www.royalroad.com/fiction/syndication/68679"
+      },
+      {
+        "name": "heretical fishing",
+        "ignore": true,
+        "url": "https://www.royalroad.com/fiction/syndication/67114"
+      },
+      {
+        "name": "The Stubborn Skill-Grinder In A Time Loop",
+        "url": "https://www.royalroad.com/fiction/syndication/83294"
+      },
+      {
+        "name": "TeeKay",
+        "url": "https://www.royalroad.com/fiction/syndication/97639"
+      },
+      {
+        "name": "Book of the dead",
+        "ignore": true,
+        "url": "https://www.royalroad.com/fiction/syndication/47038"
+      },
+      {
+          "name": "rebirth",
+          "ignore": true,
+          "dry_run": true,
+          "url": "https://www.royalroad.com/fiction/syndication/103565"
+      },
+      {
+          "name": "all the skills",
+          "url": "https://www.royalroad.com/fiction/syndication/55687"
+      }
+    ]
+}
