@@ -309,3 +309,17 @@ def execute():
     logger.info("Feed processing started.")
     feed = get_feed_list()
     process_feed(feed)
+
+if __name__ == "__main__":
+    # Test with a smaller feed list
+    test_feed_data = {
+        "dry_run": True,
+        "feeds": [
+            {
+                "name": "Primal Hunter",
+                "url": "https://www.royalroad.com/fiction/syndication/36049"
+            }
+        ]
+    }
+    test_feed = Feed(**test_feed_data)
+    process_feed(test_feed)
