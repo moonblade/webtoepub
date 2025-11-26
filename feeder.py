@@ -1,6 +1,6 @@
 import json
 import os
-from time import time
+import time
 from typing import List
 from db import add_entry, has_entry
 from models import EmailBatch, Entry, EntryType, Feed, FeedItem
@@ -42,15 +42,25 @@ def get_feed_list() -> List[FeedItem]:
             feed = Feed(**data)
             return feed
 
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitizes a filename by replacing invalid characters.
+    """
+    # Replace forward slashes and other problematic characters
+    invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|']
+    for char in invalid_chars:
+        filename = filename.replace(char, '-')
+    return filename
+
 def download(entry: Entry, feed: FeedItem):
     """
     Downloads the content of an entry to disk.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
     html_download_path = os.path.join(feed_path, "html")
     os.makedirs(feed_path, exist_ok=True)
     os.makedirs(html_download_path, exist_ok=True)
-    html_file_path = os.path.join(html_download_path, f"{entry.title}.html")
+    html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
     if os.path.exists(html_file_path):
         return
     logger.info(f"Downloading content from {entry.link} to {html_file_path}")
@@ -118,11 +128,11 @@ def clean(entry: Entry, feed: FeedItem):
     """
     Cleans the downloaded content of an entry.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
     html_download_path = os.path.join(feed_path, "html")
-    html_file_path = os.path.join(html_download_path, f"{entry.title}.html")
+    html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
     cleaned_download_path = os.path.join(feed_path, "cleaned")
-    cleaned_file_path = os.path.join(cleaned_download_path, f"{entry.title}.html")
+    cleaned_file_path = os.path.join(cleaned_download_path, f"{sanitize_filename(entry.title)}.html")
     os.makedirs(cleaned_download_path, exist_ok=True)
     if os.path.exists(cleaned_file_path):
         return
@@ -143,10 +153,10 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     """
     Converts the cleaned content of an entry to an EPUB file.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
-    cleaned_html_path = os.path.join(feed_path, "cleaned", f"{entry.title}.html")
-    epub_file_path_no_space = os.path.join(feed_path, f"{entry.get_file_name()}.epub")
-    epub_file_path = os.path.join(feed_path, f"{entry.title}.epub")
+    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
+    epub_file_path_no_space = os.path.join(feed_path, f"{sanitize_filename(entry.get_file_name())}.epub")
+    epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     if os.path.exists(epub_file_path):
         return
     logger.info(f"Converting cleaned content from {cleaned_html_path} to EPUB")
@@ -171,8 +181,8 @@ def prepare_email(entry: Entry, feed: FeedItem):
     Prepares an email for sending by validating the EPUB file exists and entry hasn't been sent.
     Returns None if the email shouldn't be sent.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
-    epub_file_path = os.path.join(feed_path, f"{entry.title}.epub")
+    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     
     if not os.path.exists(epub_file_path):
         logger.error(f"EPUB file not found: {epub_file_path}")
@@ -210,15 +220,15 @@ def send_batch_emails(email_batch: List[EmailBatch], feed: Feed):
                 content=f"EPUB file for {batch.entry.title} is attached.",
                 attachment_path=batch.epub_path
             )
-            batch.entry.time_sent = int(time())
+            batch.entry.time_sent = int(time.time())
             add_entry(batch.entry, batch.feed)
 
 def send_email(entry: Entry, feed: FeedItem):
     """
     Sends an email with the EPUB file attached.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
-    epub_file_path = os.path.join(feed_path, f"{entry.title}.epub")
+    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     if not os.path.exists(epub_file_path):
         logger.error(f"EPUB file not found: {epub_file_path}")
         return
@@ -233,10 +243,72 @@ def send_email(entry: Entry, feed: FeedItem):
             content=f"EPUB file for {entry.title} is attached.",
             attachment_path=epub_file_path
         )
-    entry.time_sent = int(time())
+    entry.time_sent = int(time.time())
     add_entry(entry, feed)
 
-def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False):
+def get_royal_road_chapters(feed_url: str) -> List[Entry]:
+    """
+    Scrapes the Royal Road table of contents page to get all chapter links.
+    Extracts the fiction ID from the RSS feed URL and constructs the main page URL.
+    """
+    try:
+        # Extract fiction ID from RSS URL (e.g., /fiction/syndication/36049 -> 36049)
+        fiction_id_match = re.search(r'/fiction/syndication/(\d+)', feed_url)
+        if not fiction_id_match:
+            logger.error(f"Could not extract fiction ID from URL: {feed_url}")
+            return []
+        
+        fiction_id = fiction_id_match.group(1)
+        fiction_url = f"https://www.royalroad.com/fiction/{fiction_id}"
+        
+        logger.info(f"Scraping Royal Road table of contents from {fiction_url}")
+        
+        session = HTMLSession()
+        response = session.get(fiction_url)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.html.html, "lxml")
+        
+        # Find the table of contents - Royal Road uses <table id="chapters">
+        chapters_table = soup.find("table", id="chapters")
+        if not chapters_table:
+            logger.error("Could not find chapters table on Royal Road page")
+            return []
+        
+        # Get the book title
+        title_element = soup.find("h1", class_="font-white")
+        book_title = title_element.get_text(strip=True) if title_element else "Unknown Book"
+        
+        entries = []
+        # Find all chapter rows in the table
+        chapter_rows = chapters_table.find_all("tr")
+        
+        for row in chapter_rows:
+            # Find the link in the row
+            link = row.find("a", href=re.compile(r"/fiction/\d+/[^/]+/chapter/\d+"))
+            if not link:
+                continue
+                
+            chapter_url = "https://www.royalroad.com" + link['href']
+            chapter_title = link.get_text(strip=True)
+            
+            # Create Entry object with current timestamp for published_parsed
+            entry = Entry(
+                title=chapter_title,
+                link=chapter_url,
+                entryType=EntryType.royalroad,
+                published_parsed=time.localtime()
+            )
+            entries.append(entry)
+        
+        logger.info(f"Found {len(entries)} chapters on Royal Road table of contents")
+        return entries
+        
+    except Exception as e:
+        logger.exception(f"Error scraping Royal Road table of contents: {e}")
+        return []
+
+def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, skip_date: bool = False):
     """
     Processes a single entry in a feed.
     """
@@ -251,7 +323,8 @@ def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False):
             if entry.ignore():
                 logger.info(f"Ignoring entry: {entry.title}")
                 return
-        entry.title = entry.get_date() + " - " + entry.title
+        if not skip_date:
+            entry.title = entry.get_date() + " - " + entry.title
         download(entry, feed)
         clean(entry, feed)
         convert_to_epub(entry, feed)
@@ -266,8 +339,8 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
     """
     Creates a single compiled ebook from multiple entries.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
-    compiled_epub_filename = f"{feed.title}_compiled.epub"
+    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    compiled_epub_filename = f"{sanitize_filename(feed.title)}_compiled.epub"
     compiled_epub_path = os.path.join(feed_path, compiled_epub_filename)
         
     logger.info(f"Creating compiled ebook for {feed.title} with {len(entries)} chapters")
@@ -279,9 +352,9 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
         with open(compiled_html_path, "w") as compiled_file:
             compiled_file.write("<html><body>\n")
             
-            # Reverse entries to get oldest first
-            for entry in reversed(entries):
-                cleaned_html_path = os.path.join(feed_path, "cleaned", f"{entry.title}.html")
+            # Entries should already be in oldest-first order
+            for entry in entries:
+                cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
                 if os.path.exists(cleaned_html_path):
                     # Add chapter title as h1 heading
                     compiled_file.write(f"<h1>{entry.title}</h1>\n")
@@ -353,11 +426,31 @@ def process_feed_item(feed: FeedItem):
         if len(unprocessed_entries) > ENTRY_THRESHOLD_FOR_NEW_BOOK:
             logger.info(f"Detected new book with {len(unprocessed_entries)} unprocessed entries (>{ENTRY_THRESHOLD_FOR_NEW_BOOK}). Creating compiled ebook.")
             
+            # Store original RSS feed entries before potentially replacing them
+            original_rss_entries = unprocessed_entries.copy()
+            
+            # For Royal Road books, scrape the table of contents to get all chapters
+            if "royalroad.com" in feed.url:
+                logger.info("Royal Road feed detected. Scraping table of contents for complete book.")
+                all_chapters = get_royal_road_chapters(feed.url)
+                if all_chapters:
+                    # Filter to only unprocessed chapters and reverse to get oldest first
+                    unprocessed_entries = [entry for entry in all_chapters if not has_entry(entry)]
+                    logger.info(f"Found {len(unprocessed_entries)} unprocessed chapters from Royal Road TOC")
+                    
+                    # If TOC has no unprocessed entries, mark original RSS entries as processed to avoid reprocessing
+                    if len(unprocessed_entries) == 0:
+                        logger.info("No unprocessed chapters from TOC. Marking original RSS entries as processed.")
+                        for entry in original_rss_entries:
+                            entry.time_sent = int(time.time())
+                            add_entry(entry, feed)
+                        return email_batch
+            
             # Process all entries without preparing individual emails
             processed_entries = []
             for entry in unprocessed_entries:
                 try:
-                    process_entry(entry, feed, skip_email_prep=True)
+                    process_entry(entry, feed, skip_email_prep=True, skip_date=True)
                     processed_entries.append(entry)
                 except Exception as e:
                     logger.exception(f"Error processing entry: {e}")
@@ -376,11 +469,13 @@ def process_feed_item(feed: FeedItem):
                         feed=feed,
                         epub_path=compiled_epub_path
                     ))
-                    
-                    # Mark all entries as sent
-                    for entry in processed_entries:
-                        entry.time_sent = int(time())
-                        add_entry(entry, feed)
+            
+            # Mark all entries as processed regardless of email batch creation
+            # This prevents treating it as a new book on next run
+            for entry in processed_entries:
+                entry.time_sent = int(time.time())
+                add_entry(entry, feed)
+            logger.info(f"Marked {len(processed_entries)} chapters as processed")
         else:
             # Normal processing for regular updates
             for entry in entries:
