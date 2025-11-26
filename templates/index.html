@@ -51,12 +51,19 @@
             margin-bottom: 16px;
             padding: 20px;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
 
         .item-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .item-content {
+            flex: 1;
+            cursor: pointer;
         }
 
         .item-title {
@@ -75,7 +82,7 @@
             font-size: 0.9rem;
         }
 
-        .revert-btn {
+        .delete-btn {
             background-color: #cf6679;
             color: white;
             border: none;
@@ -83,17 +90,135 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.9rem;
-            margin-top: 10px;
             transition: background-color 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
         }
 
-        .revert-btn:hover {
+        .delete-btn:hover {
             background-color: #b00020;
         }
 
-        .revert-btn:disabled {
+        .delete-btn:disabled {
             background-color: #555;
             cursor: not-allowed;
+        }
+
+        .delete-icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* Dialog Styles */
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dialog-overlay.active {
+            display: flex;
+        }
+
+        .dialog-box {
+            background-color: var(--surface);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .dialog-title {
+            color: var(--primary);
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+        }
+
+        .dialog-message {
+            color: var(--text);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .dialog-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .dialog-btn.cancel {
+            background-color: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--text-secondary);
+        }
+
+        .dialog-btn.cancel:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .dialog-btn.confirm {
+            background-color: #cf6679;
+            color: white;
+        }
+
+        .dialog-btn.confirm:hover {
+            background-color: #b00020;
+        }
+
+        /* Toast Styles */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background-color: var(--surface);
+            color: var(--text);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            border-left: 4px solid #4caf50;
+        }
+
+        .toast.error {
+            border-left: 4px solid #cf6679;
+        }
+
+        .toast-icon {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
         }
 
         @media (max-width: 768px) {
@@ -120,17 +245,35 @@
             {% for item in sent_items %}
             <li>
                 <div class="item-card">
-                    <a href="{{ item.link }}" target="_blank" style="text-decoration: none;">
+                    <a href="{{ item.link }}" target="_blank" style="text-decoration: none;" class="item-content">
                         <div class="item-title">{{ item.title }}</div>
                         <div class="item-meta">
                             Sent on: <span class="timestamp" data-time="{{ item.time_sent }}"></span>
                         </div>
                     </a>
-                    <button class="revert-btn" onclick="revertEntry(event, '{{ item.link }}')">Revert</button>
+                    <button class="delete-btn" onclick="deleteEntry(event, '{{ item.link }}')">
+                        <svg class="delete-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                    </button>
                 </div>
             </li>
             {% endfor %}
         </ul>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div class="dialog-overlay" id="deleteDialog">
+        <div class="dialog-box">
+            <div class="dialog-title">Delete Entry</div>
+            <div class="dialog-message" id="dialogMessage">
+                Are you sure you want to delete this entry? This will remove all associated files and the entry will be processed again on the next run.
+            </div>
+            <div class="dialog-actions">
+                <button class="dialog-btn cancel" onclick="closeDialog()">Cancel</button>
+                <button class="dialog-btn confirm" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -150,42 +293,85 @@
             });
         });
 
-        // Revert entry function
-        async function revertEntry(event, link) {
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icon = type === 'success' 
+                ? '<svg class="toast-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+                : '<svg class="toast-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
+            
+            toast.innerHTML = `${icon}<span>${message}</span>`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Dialog functions
+        function openDialog(callback) {
+            const dialog = document.getElementById('deleteDialog');
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            
+            dialog.classList.add('active');
+            
+            confirmBtn.onclick = () => {
+                closeDialog();
+                callback();
+            };
+        }
+
+        function closeDialog() {
+            const dialog = document.getElementById('deleteDialog');
+            dialog.classList.remove('active');
+        }
+
+        // Close dialog on overlay click
+        document.getElementById('deleteDialog').addEventListener('click', (e) => {
+            if (e.target.id === 'deleteDialog') {
+                closeDialog();
+            }
+        });
+
+        // Delete entry function
+        async function deleteEntry(event, link) {
             event.preventDefault();
             event.stopPropagation();
             
-            const button = event.target;
+            const button = event.target.closest('button');
             
-            if (!confirm('Are you sure you want to revert this entry? This will delete all associated files and the entry will be processed again on the next run.')) {
-                return;
-            }
-            
-            button.disabled = true;
-            button.textContent = 'Reverting...';
-            
-            try {
-                const response = await fetch(`/revert/${encodeURIComponent(link)}`, {
-                    method: 'POST'
-                });
+            openDialog(async () => {
+                button.disabled = true;
+                button.innerHTML = '<svg class="delete-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg> Deleting...';
                 
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert(`Successfully reverted: ${result.title}`);
-                    // Reload the page to show updated list
-                    window.location.reload();
-                } else {
-                    alert(`Failed to revert entry: ${result.message}`);
+                try {
+                    const response = await fetch(`/revert/${encodeURIComponent(link)}`, {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showToast(`Successfully deleted: ${result.title}`, 'success');
+                        // Reload the page after toast shows
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        showToast(`Failed to delete: ${result.message}`, 'error');
+                        button.disabled = false;
+                        button.innerHTML = '<svg class="delete-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg> Delete';
+                    }
+                } catch (error) {
+                    console.error('Error deleting entry:', error);
+                    showToast('An error occurred while deleting the entry.', 'error');
                     button.disabled = false;
-                    button.textContent = 'Revert';
+                    button.innerHTML = '<svg class="delete-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg> Delete';
                 }
-            } catch (error) {
-                console.error('Error reverting entry:', error);
-                alert('An error occurred while reverting the entry.');
-                button.disabled = false;
-                button.textContent = 'Revert';
-            }
+            });
         }
     </script>
 </body>
