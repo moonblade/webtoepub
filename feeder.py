@@ -77,12 +77,13 @@ def clean_wandering_inn(html_content: str) -> str:
     """
     soup = BeautifulSoup(html_content, "lxml")
 
-    article = soup.find("article")
+    article = soup.find("div", class_="reader-container")
     if article is None:
         return ""
 
-    entry_content = article.find("div", class_="entry-content")
+    entry_content = article.find("div", class_="elementor-widget-theme-post-content")
     if entry_content is None:
+        logger.warn("Could not find the entry content div")
         return ""
 
     # Remove unwanted elements (consistent style)
@@ -521,8 +522,8 @@ if __name__ == "__main__":
         "dry_run": True,
         "feeds": [
             {
-                "name": "Primal Hunter",
-                "url": "https://www.royalroad.com/fiction/syndication/36049"
+                "name": "The wandering inn",
+                "url": "https://wanderinginn.com/feed/"
             }
         ]
     }
