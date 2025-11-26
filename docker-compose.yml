@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  webtoepub:
+    build: .
+    container_name: webtoepub
+    ports:
+      - "9000:9000"
+    volumes:
+      # Persistent storage for feeds, EPUBs, and database
+      - ./feeds:/feeds
+      # Configuration files (read-only)
+      - ./secrets/mailconfig.json:/app/secrets/mailconfig.json:ro
+      - ./feed.input.json:/app/feed.input.json:ro
+      - ./keywords.txt:/app/keywords.txt:ro
+    environment:
+      # Email configuration
+      - SENDER_EMAIL=${SENDER_EMAIL}
+      - APP_PASSWORD=${APP_PASSWORD}
+      - TO_EMAIL=${TO_EMAIL}
+      
+      # Application settings
+      - DOWNLOAD_PATH=/feeds
+      - UPDATE_FREQUENCY_SECONDS=900  # 15 minutes
+      - DEBUG_MODE=false
+      - MAX_BATCH_SIZE=20
+      - ENTRY_THRESHOLD_FOR_NEW_BOOK=5
+      
+      # Optional: Remote feed URL
+      # - FEEDURL=https://your-feed-server.com/api/feeds
+      
+      # Optional: Test file for volume verification
+      # - TEST_FILE=/feeds/.mounted
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

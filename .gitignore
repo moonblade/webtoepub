@@ -1,7 +1,35 @@
-output
+# Output directories
+output/
+feeds/
+books/
+
+# Database files
 completed.db
-.DS_Store
-cron.log
 completedObjects.db
-books
-__pycache__
+db.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Secrets and configuration
+secrets/
+.env
+
+# macOS
+.DS_Store
+
+# Logs
+cron.log
+*.log
+
+# Temporary files
+/tmp/
+*.tmp
+*.temp
