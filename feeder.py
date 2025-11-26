@@ -18,6 +18,7 @@ WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderingi
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
 MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "20"))
+ENTRY_THRESHOLD_FOR_NEW_BOOK = int(os.getenv("ENTRY_THRESHOLD_FOR_NEW_BOOK", "5"))
 logger = custom_logger(__name__)
 
 with open("./keywords.txt", 'r') as file:
@@ -235,7 +236,7 @@ def send_email(entry: Entry, feed: FeedItem):
     entry.time_sent = int(time())
     add_entry(entry, feed)
 
-def process_entry(entry: Entry, feed: FeedItem):
+def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False):
     """
     Processes a single entry in a feed.
     """
@@ -254,10 +255,74 @@ def process_entry(entry: Entry, feed: FeedItem):
         download(entry, feed)
         clean(entry, feed)
         convert_to_epub(entry, feed)
+        if skip_email_prep:
+            return None
         return prepare_email(entry, feed)
 
     except Exception as e:
         logger.exception(f"Error processing entry: {e}")
+
+def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
+    """
+    Creates a single compiled ebook from multiple entries.
+    """
+    feed_path = os.path.join(DOWNLOAD_PATH, feed.title)
+    compiled_epub_filename = f"{feed.title}_compiled.epub"
+    compiled_epub_path = os.path.join(feed_path, compiled_epub_filename)
+        
+    logger.info(f"Creating compiled ebook for {feed.title} with {len(entries)} chapters")
+    
+    # Create a combined HTML file with chapter titles
+    compiled_html_path = os.path.join(feed_path, "compiled_temp.html")
+    
+    try:
+        with open(compiled_html_path, "w") as compiled_file:
+            compiled_file.write("<html><body>\n")
+            
+            # Reverse entries to get oldest first
+            for entry in reversed(entries):
+                cleaned_html_path = os.path.join(feed_path, "cleaned", f"{entry.title}.html")
+                if os.path.exists(cleaned_html_path):
+                    # Add chapter title as h1 heading
+                    compiled_file.write(f"<h1>{entry.title}</h1>\n")
+                    
+                    # Read and append chapter content
+                    with open(cleaned_html_path, "r") as chapter_file:
+                        chapter_content = chapter_file.read()
+                        compiled_file.write(chapter_content)
+                        compiled_file.write("\n")
+            
+            compiled_file.write("</body></html>")
+        
+        # Convert the combined HTML to EPUB
+        compiled_epub_path_no_space = os.path.join(feed_path, f"{feed.title.replace(' ', '_')}_compiled.epub")
+        
+        extra_args = [
+            '--metadata', f'title={feed.title} - Complete',
+            '--metadata', 'lang=en-US',
+            '--css', "./epub.css",
+            '--toc-depth=1'
+        ]
+        
+        pypandoc.convert_file(
+            compiled_html_path,
+            'epub',
+            outputfile=compiled_epub_path_no_space,
+            extra_args=extra_args
+        )
+        os.rename(compiled_epub_path_no_space, compiled_epub_path)
+        
+        # Clean up temporary file
+        os.remove(compiled_html_path)
+        
+        logger.info(f"Compiled EPUB file saved to {compiled_epub_path}")
+        return compiled_epub_path
+    except Exception as e:
+        logger.exception(f"Error creating compiled ebook: {e}")
+        # Clean up temporary file on error
+        if os.path.exists(compiled_html_path):
+            os.remove(compiled_html_path)
+        return None
 
 def process_feed_item(feed: FeedItem):
     """
@@ -273,14 +338,59 @@ def process_feed_item(feed: FeedItem):
         feed_data = feedparser.parse(feed.url)
         feed.title = feed_data.feed.get("title", "")
         entries = feed_data.get("entries", [])
+        
+        # Check how many unprocessed entries there are
+        unprocessed_entries = []
         for entry in entries:
             try:
                 entry = Entry(**entry)
-                batch = process_entry(entry, feed)
-                if batch:
-                    email_batch.append(batch)
+                if not has_entry(entry):
+                    unprocessed_entries.append(entry)
             except Exception as e:
-                logger.exception(f"Error processing entry: {e}")
+                logger.exception(f"Error checking entry: {e}")
+        
+        # Special logic for new books with many unprocessed entries
+        if len(unprocessed_entries) > ENTRY_THRESHOLD_FOR_NEW_BOOK:
+            logger.info(f"Detected new book with {len(unprocessed_entries)} unprocessed entries (>{ENTRY_THRESHOLD_FOR_NEW_BOOK}). Creating compiled ebook.")
+            
+            # Process all entries without preparing individual emails
+            processed_entries = []
+            for entry in unprocessed_entries:
+                try:
+                    process_entry(entry, feed, skip_email_prep=True)
+                    processed_entries.append(entry)
+                except Exception as e:
+                    logger.exception(f"Error processing entry: {e}")
+            
+            # Create compiled ebook
+            compiled_epub_path = create_compiled_ebook(processed_entries, feed)
+            
+            if compiled_epub_path and os.path.exists(compiled_epub_path):
+                # Create a single email batch for the compiled ebook
+                # Use the first entry as representative
+                if processed_entries:
+                    representative_entry = processed_entries[0]
+                    representative_entry.title = f"{feed.title} - Complete ({len(processed_entries)} chapters)"
+                    email_batch.append(EmailBatch(
+                        entry=representative_entry,
+                        feed=feed,
+                        epub_path=compiled_epub_path
+                    ))
+                    
+                    # Mark all entries as sent
+                    for entry in processed_entries:
+                        entry.time_sent = int(time())
+                        add_entry(entry, feed)
+        else:
+            # Normal processing for regular updates
+            for entry in entries:
+                try:
+                    entry = Entry(**entry)
+                    batch = process_entry(entry, feed)
+                    if batch:
+                        email_batch.append(batch)
+                except Exception as e:
+                    logger.exception(f"Error processing entry: {e}")
     except Exception as e:
         logger.exception(f"Error processing feed {feed.name}: {e}")
     return email_batch
