@@ -27,3 +27,12 @@ def get_entries() -> list[Entry]:
     """
     entries = db.all()
     return [Entry(**entry) for entry in sorted(entries, key=lambda x: x["time_sent"], reverse=True)]
+
+def delete_entry(link: str) -> bool:
+    """
+    Deletes an entry from the database by link.
+    Returns True if entry was deleted, False otherwise.
+    """
+    Entry = Query()
+    result = db.remove(Entry.link == link)
+    return len(result) > 0

@@ -75,6 +75,27 @@
             font-size: 0.9rem;
         }
 
+        .revert-btn {
+            background-color: #cf6679;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .revert-btn:hover {
+            background-color: #b00020;
+        }
+
+        .revert-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -98,14 +119,15 @@
         <ul class="items-list">
             {% for item in sent_items %}
             <li>
-                <a href="{{ item.link }}" target="_blank" style="text-decoration: none;">
-                    <div class="item-card">
+                <div class="item-card">
+                    <a href="{{ item.link }}" target="_blank" style="text-decoration: none;">
                         <div class="item-title">{{ item.title }}</div>
                         <div class="item-meta">
                             Sent on: <span class="timestamp" data-time="{{ item.time_sent }}"></span>
                         </div>
-                    </div>
-                </a>
+                    </a>
+                    <button class="revert-btn" onclick="revertEntry(event, '{{ item.link }}')">Revert</button>
+                </div>
             </li>
             {% endfor %}
         </ul>
@@ -127,6 +149,44 @@
                 });
             });
         });
+
+        // Revert entry function
+        async function revertEntry(event, link) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const button = event.target;
+            
+            if (!confirm('Are you sure you want to revert this entry? This will delete all associated files and the entry will be processed again on the next run.')) {
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = 'Reverting...';
+            
+            try {
+                const response = await fetch(`/revert/${encodeURIComponent(link)}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Successfully reverted: ${result.title}`);
+                    // Reload the page to show updated list
+                    window.location.reload();
+                } else {
+                    alert(`Failed to revert entry: ${result.message}`);
+                    button.disabled = false;
+                    button.textContent = 'Revert';
+                }
+            } catch (error) {
+                console.error('Error reverting entry:', error);
+                alert('An error occurred while reverting the entry.');
+                button.disabled = false;
+                button.textContent = 'Revert';
+            }
+        }
     </script>
 </body>
 </html>

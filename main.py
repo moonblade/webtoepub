@@ -61,6 +61,50 @@ async def get_sent_items():
     """
     return get_entries()
 
+@app.post("/revert/{link:path}")
+async def revert_entry(link: str):
+    """
+    Reverts an entry by removing it from the database and deleting associated files.
+    """
+    from db import delete_entry
+    from utils import delete_entry_files
+    
+    # Get the entry before deleting to access its metadata
+    entries = get_entries()
+    entry_to_delete = None
+    for entry in entries:
+        if entry.link == link:
+            entry_to_delete = entry
+            break
+    
+    if not entry_to_delete:
+        logger.error(f"Entry not found with link: {link}")
+        return {"success": False, "message": "Entry not found"}
+    
+    # Delete from database
+    deleted = delete_entry(link)
+    
+    if deleted:
+        # Delete associated files
+        download_path = os.getenv("DOWNLOAD_PATH", "/feeds")
+        feed_title = entry_to_delete.dict().get("feed", {}).get("title", "")
+        
+        deleted_files = delete_entry_files(
+            entry_to_delete.title,
+            feed_title,
+            download_path
+        )
+        
+        logger.info(f"Reverted entry: {entry_to_delete.title} (deleted {deleted_files} files)")
+        return {
+            "success": True,
+            "message": f"Entry reverted successfully. Deleted {deleted_files} files.",
+            "title": entry_to_delete.title
+        }
+    else:
+        logger.error(f"Failed to delete entry from database: {link}")
+        return {"success": False, "message": "Failed to delete entry from database"}
+
 # @app.on_event("startup")
 # async def startup_event():
 #     if not DEBUG_MODE:
