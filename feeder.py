@@ -52,6 +52,29 @@ def sanitize_filename(filename: str) -> str:
         filename = filename.replace(char, '-')
     return filename
 
+def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
+    """
+    Checks if the downloaded HTML file contains a patreon-protected-post div.
+    Returns True if the content is patreon-locked.
+    """
+    try:
+        if not os.path.exists(html_file_path):
+            return False
+        
+        with open(html_file_path, "r") as f:
+            html_content = f.read()
+        
+        soup = BeautifulSoup(html_content, "lxml")
+        patreon_div = soup.find("div", class_="patreon-protected-post")
+        
+        if patreon_div:
+            logger.info(f"Entry {entry.title} is patreon-locked")
+            return True
+        return False
+    except Exception as e:
+        logger.exception(f"Error checking patreon lock: {e}")
+        return False
+
 def download(entry: Entry, feed: FeedItem):
     """
     Downloads the content of an entry to disk.
@@ -70,6 +93,12 @@ def download(entry: Entry, feed: FeedItem):
     with open(html_file_path, "w") as f:
         f.write(response.html.html)
     logger.info(f"Downloaded content {html_file_path}")
+    
+    if is_patreon_locked(entry, html_file_path):
+        entry.set_patreon_lock()
+        add_entry(entry, feed)
+        os.remove(html_file_path)
+        logger.info(f"Removed patreon-locked file: {html_file_path}")
 
 def clean_wandering_inn(html_content: str) -> str:
     """
@@ -327,6 +356,9 @@ def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, s
         if not skip_date:
             entry.title = entry.get_date() + " - " + entry.title
         download(entry, feed)
+        if entry.ignore():
+            logger.info(f"Ignoring entry after download: {entry.title}")
+            return
         clean(entry, feed)
         convert_to_epub(entry, feed)
         if skip_email_prep:

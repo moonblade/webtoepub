@@ -24,12 +24,22 @@ class Entry(BaseModel):
     entryType: EntryType = EntryType.royalroad
     published_parsed: tuple
     time_sent: Optional[int] = 0
+    patreon_lock: Optional[int] = 0
 
     def get_date(self) -> str:
         return time.strftime("%Y-%m-%d", self.published_parsed)
 
+    def set_patreon_lock(self):
+        """Sets the patreon lock to current time + 1 day (86400 seconds)"""
+        self.patreon_lock = int(time.time()) + 86400
+
     def ignore(self) -> bool:
-        return "Patron Early Access:" in self.title
+        if "Patron Early Access:" in self.title:
+            return True
+        # Check if patreon_lock exists and hasn't expired yet
+        if self.patreon_lock and self.patreon_lock > 0:
+            return int(time.time()) < self.patreon_lock
+        return False
 
     def get_file_name(self) -> str:
         return self.title.replace(" ", "_")

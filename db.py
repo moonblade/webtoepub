@@ -3,6 +3,10 @@ from models import Entry, FeedItem
 from tinydb import TinyDB, Query
 
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
+
+if not os.path.exists(DOWNLOAD_PATH):
+    os.makedirs(DOWNLOAD_PATH)
+
 db = TinyDB(os.path.join(DOWNLOAD_PATH, 'db.json'))
 
 def add_entry(entry: Entry, feed: FeedItem):
@@ -18,7 +22,7 @@ def has_entry(entry: Entry) -> bool:
     Checks if an entry exists in the database.
     """
     Entry = Query()
-    return db.contains((Entry.link == entry.link))
+    return db.contains((Entry.link == entry.link) & (Entry.time_sent != 0))
     # return db.contains((Entry.title == entry.title) & (Entry.link == entry.link))
 
 def get_entries() -> list[Entry]:
