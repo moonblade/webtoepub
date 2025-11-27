@@ -241,6 +241,7 @@ def send_batch_emails(email_batch: List[EmailBatch], feed: Feed):
     if feed.dry_run:
         for batch in email_batch:
             logger.info(f"DRY RUN: Would have sent email with EPUB file: {batch.epub_path}")
+            batch.entry.time_sent = int(time.time())
             add_entry(batch.entry, batch.feed)
     else:
         for batch in email_batch:
@@ -352,6 +353,8 @@ def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, s
             entry.title = feed.title + " - " + entry.title
             if entry.ignore():
                 logger.info(f"Ignoring entry: {entry.title}")
+                return
+            if has_entry(entry):
                 return
         if not skip_date:
             entry.title = entry.get_date() + " - " + entry.title

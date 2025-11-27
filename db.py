@@ -1,4 +1,5 @@
 import os
+import time
 from models import Entry, FeedItem
 from tinydb import TinyDB, Query
 
@@ -22,8 +23,13 @@ def has_entry(entry: Entry) -> bool:
     Checks if an entry exists in the database.
     """
     Entry = Query()
-    return db.contains((Entry.link == entry.link) & (Entry.time_sent != 0))
-    # return db.contains((Entry.title == entry.title) & (Entry.link == entry.link))
+    current_time = int(time.time())
+    response = db.contains(
+        (Entry.link == entry.link) & 
+        ((Entry.time_sent != 0) | 
+         ((Entry.time_sent == 0) & (Entry.patreon_lock > current_time)))
+    )
+    return response
 
 def get_entries() -> list[Entry]:
     """
