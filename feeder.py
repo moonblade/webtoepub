@@ -552,15 +552,44 @@ def execute():
     process_feed(feed)
 
 if __name__ == "__main__":
-    # Test with a smaller feed list
-    test_feed_data = {
-        "dry_run": True,
-        "feeds": [
-            {
-                "name": "The wandering inn",
-                "url": "https://wanderinginn.com/feed/"
-            }
-        ]
-    }
-    test_feed = Feed(**test_feed_data)
-    process_feed(test_feed)
+    import csv
+    
+    # Read entries from CSV file
+    csv_path = "/tmp/chapters9.csv"
+    entries = []
+    
+    with open(csv_path, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            entry = Entry(
+                title=row['chapter_number'],
+                link=row['link'],
+                entryType=EntryType.wanderinginn,
+                published_parsed=time.localtime()
+            )
+            entries.append(entry)
+    
+    logger.info(f"Loaded {len(entries)} entries from CSV")
+    
+    # Create test feed
+    feed_item = FeedItem(
+        name="The Wandering Inn Test",
+        title="The Wandering Inn",
+        url="https://wanderinginn.com/feed/",
+        dry_run=True
+    )
+    
+    # Process all entries (skip email prep since we want compiled output)
+    for entry in entries:
+        try:
+            process_entry(entry, feed_item, skip_email_prep=True, skip_date=True)
+        except Exception as e:
+            logger.exception(f"Error processing entry: {e}")
+    
+    # Create compiled ebook
+    compiled_epub_path = create_compiled_ebook(entries, feed_item)
+    
+    if compiled_epub_path:
+        logger.info(f"Compiled ebook created at: {compiled_epub_path}")
+    else:
+        logger.error("Failed to create compiled ebook")

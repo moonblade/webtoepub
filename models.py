@@ -2,6 +2,10 @@ from enum import Enum
 from pydantic import BaseModel, HttpUrl
 from typing import Optional
 import time
+import os  # Added for environment variable access
+
+PATREON_LOCK_HOURS = int(os.environ.get("PATREON_LOCK_HOURS", 4))  # Default to 4 hours
+
 
 class FeedItem(BaseModel):
     title: str = ""
@@ -30,8 +34,8 @@ class Entry(BaseModel):
         return time.strftime("%Y-%m-%d", self.published_parsed)
 
     def set_patreon_lock(self):
-        """Sets the patreon lock to current time + 1 day (86400 seconds)"""
-        self.patreon_lock = int(time.time()) + 86400
+        """Sets the patreon lock to current time + PATREON_LOCK_HOURS (in seconds)"""
+        self.patreon_lock = int(time.time()) + PATREON_LOCK_HOURS * 3600
 
     def ignore(self) -> bool:
         if "Patron Early Access:" in self.title:
