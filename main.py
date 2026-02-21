@@ -1,6 +1,7 @@
 import logging
 import os
-from db import get_entries
+import re
+from db import get_entries, get_all_feeds, add_feed, update_feed, delete_feed, migrate_feeds_from_json
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from datetime import datetime
@@ -9,6 +10,8 @@ import uvicorn
 from feeder import execute
 import asyncio
 from fastapi.templating import Jinja2Templates
+from models import FeedItem
+import feedparser
 
 app = FastAPI()
 logger = custom_logger(__name__)
@@ -104,6 +107,113 @@ async def revert_entry(link: str):
     else:
         logger.error(f"Failed to delete entry from database: {link}")
         return {"success": False, "message": "Failed to delete entry from database"}
+
+
+# ============== Feed Configuration Endpoints ==============
+
+@app.get("/configure", response_class=HTMLResponse)
+async def configure_page(request: Request):
+    migrate_feeds_from_json()
+    feeds = get_all_feeds()
+    return templates.TemplateResponse("configure.html", {"request": request, "feeds": feeds})
+
+
+@app.get("/api/feeds")
+async def api_get_feeds():
+    migrate_feeds_from_json()
+    feeds = get_all_feeds()
+    return {"success": True, "feeds": [f.dict() for f in feeds]}
+
+
+@app.post("/api/feeds")
+async def api_add_feed(request: Request):
+    data = await request.json()
+    url = data.get("url", "").strip()
+    name = data.get("name", "").strip()
+    ignore = data.get("ignore", False)
+    dry_run = data.get("dry_run", False)
+    
+    if not url:
+        return {"success": False, "message": "URL is required"}
+    if not name:
+        return {"success": False, "message": "Name is required"}
+    
+    feed = FeedItem(name=name, url=url, ignore=ignore, dry_run=dry_run)
+    success = add_feed(feed)
+    
+    if success:
+        return {"success": True, "message": "Feed added successfully"}
+    return {"success": False, "message": "Feed with this URL already exists"}
+
+
+@app.put("/api/feeds")
+async def api_update_feed(request: Request):
+    data = await request.json()
+    url = data.get("url", "").strip()
+    
+    if not url:
+        return {"success": False, "message": "URL is required"}
+    
+    updates = {}
+    if "name" in data:
+        updates["name"] = data["name"].strip()
+    if "ignore" in data:
+        updates["ignore"] = data["ignore"]
+    if "dry_run" in data:
+        updates["dry_run"] = data["dry_run"]
+    
+    if not updates:
+        return {"success": False, "message": "No updates provided"}
+    
+    success = update_feed(url, updates)
+    if success:
+        return {"success": True, "message": "Feed updated successfully"}
+    return {"success": False, "message": "Feed not found"}
+
+
+@app.delete("/api/feeds")
+async def api_delete_feed(request: Request):
+    data = await request.json()
+    url = data.get("url", "").strip()
+    
+    if not url:
+        return {"success": False, "message": "URL is required"}
+    
+    success = delete_feed(url)
+    if success:
+        return {"success": True, "message": "Feed deleted successfully"}
+    return {"success": False, "message": "Feed not found"}
+
+
+def strip_brackets_from_title(title: str) -> str:
+    """Remove content within [] and () from title."""
+    title = re.sub(r'\[.*?\]', '', title)
+    title = re.sub(r'\(.*?\)', '', title)
+    return title.strip()
+
+
+@app.post("/api/feeds/fetch-title")
+async def api_fetch_feed_title(request: Request):
+    data = await request.json()
+    url = data.get("url", "").strip()
+    
+    if not url:
+        return {"success": False, "message": "URL is required"}
+    
+    try:
+        parsed = feedparser.parse(url)
+        if parsed.bozo and not parsed.entries:
+            return {"success": False, "message": "Could not parse feed URL"}
+        
+        title = getattr(parsed.feed, 'title', '') or ''
+        if not title:
+            return {"success": False, "message": "Feed has no title"}
+        
+        clean_title = strip_brackets_from_title(title)
+        return {"success": True, "title": clean_title, "original_title": title}
+    except Exception as e:
+        logger.error(f"Error fetching feed title: {e}")
+        return {"success": False, "message": "Failed to fetch feed"}
 
 # @app.on_event("startup")
 # async def startup_event():

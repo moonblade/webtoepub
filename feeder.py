@@ -2,7 +2,7 @@ import json
 import os
 import time
 from typing import List
-from db import add_entry, has_entry
+from db import add_entry, has_entry, get_all_feeds, migrate_feeds_from_json
 from models import EmailBatch, Entry, EntryType, Feed, FeedItem
 import feedparser
 import requests
@@ -24,11 +24,18 @@ logger = custom_logger(__name__)
 with open("./keywords.txt", 'r') as file:
     KEYWORDS_TO_REMOVE = [line.strip() for line in file if line.strip()]
 
-def get_feed_list() -> List[FeedItem]:
+def get_feed_list() -> Feed:
     """
-    Retrieves a list of feed items from a given URL, parses the JSON response,
-    and returns a list of Pydantic FeedItem objects.
+    Retrieves feed items from the database.
+    On first run, migrates from feed.input.json if the feeds table is empty.
     """
+    migrate_feeds_from_json()
+    
+    feeds = get_all_feeds()
+    if feeds:
+        return Feed(feeds=feeds, dry_run=DEBUG_MODE)
+    
+    # Fallback to remote/local JSON if DB is empty and migration failed
     try:
         response = requests.get(FEEDURL)
         response.raise_for_status()
