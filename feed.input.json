@@ -34,6 +34,7 @@
       },
       {
         "name": "Path of ascension",
+        "ignore": true,
         "url": "https://www.royalroad.com/fiction/syndication/40920"
       },
       {
@@ -70,7 +71,37 @@
       },
       {
           "name": "all the skills",
+          "ignore": true,
           "url": "https://www.royalroad.com/fiction/syndication/55687"
+      },
+      {
+          "name": "The legend of william oh",
+          "url": "https://www.royalroad.com/fiction/syndication/92144"
+      },
+      {
+          "name": "Practical guide to sorcery",
+          "url": "https://www.royalroad.com/fiction/syndication/34009"
+          
+      },
+      {
+          "name": "Primal Hunter",
+          "url": "https://www.royalroad.com/fiction/syndication/36049"
+      },
+      {
+          "name": "The perfect run",
+          "url": "https://www.royalroad.com/fiction/syndication/36735"
+      },
+      {
+          "name": "12 miles below",
+          "url": "https://www.royalroad.com/fiction/syndication/42367"
+      },
+      {
+          "name": "rise of the living forge",
+          "url": "https://www.royalroad.com/fiction/syndication/79094"
+      },
+      {
+          "name": "nightmare realm summoner",
+          "url": "https://www.royalroad.com/fiction/syndication/89034"   
       }
     ]
 }
