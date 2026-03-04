@@ -207,7 +207,6 @@ This project automates the workflow of reading web fiction on your e-reader:
 | `DEBUG_MODE` | `false` | Enable debug mode (dry run, limited feeds) |
 | `MAX_BATCH_SIZE` | `20` | Maximum emails to send in one batch |
 | `ENTRY_THRESHOLD_FOR_NEW_BOOK` | `5` | Number of unprocessed entries to trigger compiled ebook creation |
-| `FEEDURL` | - | URL to fetch remote feed list (optional) |
 | `WANDERING_INN_URL_FRAGMENT` | `wanderinginn` | URL fragment to detect Wandering Inn entries |
 | `TEST_FILE` | - | Path to test file for volume mount verification |
 

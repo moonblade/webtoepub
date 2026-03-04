@@ -26,9 +26,6 @@ services:
       - MAX_BATCH_SIZE=20
       - ENTRY_THRESHOLD_FOR_NEW_BOOK=5
       
-      # Optional: Remote feed URL
-      # - FEEDURL=https://your-feed-server.com/api/feeds
-      
       # Optional: Test file for volume verification
       # - TEST_FILE=/feeds/.mounted
     restart: unless-stopped

@@ -13,7 +13,6 @@ from mail import send_gmail
 import pypandoc
 import re
 
-FEEDURL = os.getenv("FEEDURL", "https://browse.sirius.moonblade.work/api/public/dl/hf_Ov0yq")
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
@@ -35,19 +34,12 @@ def get_feed_list() -> Feed:
     if feeds:
         return Feed(feeds=feeds, dry_run=DEBUG_MODE)
     
-    # Fallback to remote/local JSON if DB is empty and migration failed
-    try:
-        response = requests.get(FEEDURL)
-        response.raise_for_status()
-        data = response.json()
+    # Fallback to local JSON if DB is empty and migration failed
+    logger.warn("No feeds in database, falling back to feed.input.json")
+    with open("./feed.input.json", 'r') as file:
+        data = json.load(file)
         feed = Feed(**data)
         return feed
-    except requests.RequestException as e:
-        logger.warn("Returning local feed due to error fetching remote feed.")
-        with open("./feed.input.json", 'r') as file:
-            data = json.load(file)
-            feed = Feed(**data)
-            return feed
 
 def sanitize_filename(filename: str) -> str:
     """
