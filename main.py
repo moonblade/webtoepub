@@ -89,13 +89,13 @@ async def revert_entry(link: str):
     
     if deleted:
         # Delete associated files
-        download_path = os.getenv("DOWNLOAD_PATH", "/feeds")
+        data_path = os.getenv("DATA_PATH", "/data")
         feed_title = entry_to_delete.dict().get("feed", {}).get("title", "")
         
         deleted_files = delete_entry_files(
             entry_to_delete.title,
             feed_title,
-            download_path
+            data_path
         )
         
         logger.info(f"Reverted entry: {entry_to_delete.title} (deleted {deleted_files} files)")

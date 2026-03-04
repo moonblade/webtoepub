@@ -107,7 +107,8 @@ This project automates the workflow of reading web fiction on your e-reader:
        ports:
          - "9000:9000"
        volumes:
-         - ./feeds:/feeds
+         - ./data:/data
+         - ./config:/config
          - ./secrets/mailconfig.json:/app/secrets/mailconfig.json:ro
          - ./feed.input.json:/app/feed.input.json:ro
          - ./keywords.txt:/app/keywords.txt:ro
@@ -115,7 +116,8 @@ This project automates the workflow of reading web fiction on your e-reader:
          - SENDER_EMAIL=${SENDER_EMAIL}
          - APP_PASSWORD=${APP_PASSWORD}
          - TO_EMAIL=${TO_EMAIL}
-         - DOWNLOAD_PATH=/feeds
+         - DATA_PATH=/data
+         - CONFIG_PATH=/config
          - UPDATE_FREQUENCY_SECONDS=900  # 15 minutes
          - DEBUG_MODE=false
          - MAX_BATCH_SIZE=20
@@ -160,7 +162,8 @@ This project automates the workflow of reading web fiction on your e-reader:
    export SENDER_EMAIL="your-email@gmail.com"
    export APP_PASSWORD="your-gmail-app-password"
    export TO_EMAIL="your-kindle-email@kindle.com"
-   export DOWNLOAD_PATH="/tmp/feeds"
+   export DATA_PATH="/tmp/data"
+   export CONFIG_PATH="/tmp/config"
    export UPDATE_FREQUENCY_SECONDS=900
    ```
 
@@ -202,7 +205,8 @@ This project automates the workflow of reading web fiction on your e-reader:
 | `SENDER_EMAIL` | - | Gmail address to send from |
 | `APP_PASSWORD` | - | Gmail app password |
 | `TO_EMAIL` | - | Kindle email address |
-| `DOWNLOAD_PATH` | `/feeds` | Directory to store downloads and database |
+| `DATA_PATH` | `/data` | Directory to store downloads and EPUBs |
+| `CONFIG_PATH` | `/config` | Directory to store database (db.json) |
 | `UPDATE_FREQUENCY_SECONDS` | `900` | How often to check for new chapters (seconds) |
 | `DEBUG_MODE` | `false` | Enable debug mode (dry run, limited feeds) |
 | `MAX_BATCH_SIZE` | `20` | Maximum emails to send in one batch |
@@ -345,13 +349,13 @@ When more than 5 unprocessed entries are detected for a feed:
 - Ensure your Gmail address is in Kindle's approved sender list
 
 **"EPUB file not found" errors:**
-- Check DOWNLOAD_PATH exists and is writable
+- Check DATA_PATH exists and is writable
 - Verify Pandoc is installed (included in pypandoc_binary)
 - Check logs for download or conversion errors
 
 **No new chapters detected:**
 - Verify RSS feed URL is correct and accessible
-- Check if entries are already in database (`/feeds/db.json`)
+- Check if entries are already in database (`$CONFIG_PATH/db.json`)
 - Use revert feature to re-process specific chapters
 
 **Docker container exits:**

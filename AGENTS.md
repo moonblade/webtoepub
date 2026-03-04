@@ -83,7 +83,8 @@ When `unprocessed_entries > ENTRY_THRESHOLD_FOR_NEW_BOOK`:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `DOWNLOAD_PATH` | `/feeds` | Storage for HTML, cleaned, EPUB, db.json |
+| `DATA_PATH` | `/data` | Storage for HTML, cleaned, EPUB files |
+| `CONFIG_PATH` | `/config` | Storage for db.json |
 | `DEBUG_MODE` | `false` | Limits to 2 feeds, sets dry_run |
 | `MAX_BATCH_SIZE` | `20` | Fails batch if exceeded |
 | `ENTRY_THRESHOLD_FOR_NEW_BOOK` | `5` | Triggers compiled ebook creation |
@@ -99,7 +100,7 @@ When `unprocessed_entries > ENTRY_THRESHOLD_FOR_NEW_BOOK`:
 
 ## DATABASE
 
-TinyDB at `$DOWNLOAD_PATH/db.json`. Entry keyed by `link`.
+TinyDB at `$CONFIG_PATH/db.json`. Entry keyed by `link`.
 
 **Patreon lock logic**: Entry ignored if `patreon_lock > current_time`. Set via `set_patreon_lock()` to `now + PATREON_LOCK_HOURS`.
 
@@ -112,7 +113,7 @@ TinyDB at `$DOWNLOAD_PATH/db.json`. Entry keyed by `link`.
 
 ## FILE ORGANIZATION
 
-Per-feed structure under `$DOWNLOAD_PATH`:
+Per-feed structure under `$DATA_PATH`:
 ```
 {feed_title}/
 ├── html/          # Raw downloaded HTML

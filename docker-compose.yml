@@ -7,8 +7,10 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      # Persistent storage for feeds, EPUBs, and database
-      - ./feeds:/feeds
+      # Persistent storage for downloads and EPUBs
+      - ./data:/data
+      # Database and config storage
+      - ./config:/config
       # Configuration files (read-only)
       - ./secrets/mailconfig.json:/app/secrets/mailconfig.json:ro
       - ./feed.input.json:/app/feed.input.json:ro
@@ -20,14 +22,15 @@ services:
       - TO_EMAIL=${TO_EMAIL}
       
       # Application settings
-      - DOWNLOAD_PATH=/feeds
+      - DATA_PATH=/data
+      - CONFIG_PATH=/config
       - UPDATE_FREQUENCY_SECONDS=900  # 15 minutes
       - DEBUG_MODE=false
       - MAX_BATCH_SIZE=20
       - ENTRY_THRESHOLD_FOR_NEW_BOOK=5
       
       # Optional: Test file for volume verification
-      # - TEST_FILE=/feeds/.mounted
+      # - TEST_FILE=/data/.mounted
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/status"]

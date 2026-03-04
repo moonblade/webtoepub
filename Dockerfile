@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-RUN mkdir -p /feeds && chmod 744 /feeds
+RUN mkdir -p /data /config && chmod 744 /data /config
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
