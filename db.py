@@ -4,12 +4,12 @@ import json
 from models import Entry, FeedItem
 from tinydb import TinyDB, Query
 
-DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
+CONFIG_PATH = os.getenv("CONFIG_PATH", "/config")
 
-if not os.path.exists(DOWNLOAD_PATH):
-    os.makedirs(DOWNLOAD_PATH)
+if not os.path.exists(CONFIG_PATH):
+    os.makedirs(CONFIG_PATH)
 
-db = TinyDB(os.path.join(DOWNLOAD_PATH, 'db.json'))
+db = TinyDB(os.path.join(CONFIG_PATH, 'db.json'))
 feeds_table = db.table('feeds')
 
 def add_entry(entry: Entry, feed: FeedItem):

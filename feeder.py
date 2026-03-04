@@ -14,7 +14,7 @@ import pypandoc
 import re
 
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
-DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "/feeds")
+DATA_PATH = os.getenv("DATA_PATH", "/data")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
 MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "20"))
 ENTRY_THRESHOLD_FOR_NEW_BOOK = int(os.getenv("ENTRY_THRESHOLD_FOR_NEW_BOOK", "5"))
@@ -78,7 +78,7 @@ def download(entry: Entry, feed: FeedItem):
     """
     Downloads the content of an entry to disk.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     html_download_path = os.path.join(feed_path, "html")
     os.makedirs(feed_path, exist_ok=True)
     os.makedirs(html_download_path, exist_ok=True)
@@ -157,7 +157,7 @@ def clean(entry: Entry, feed: FeedItem):
     """
     Cleans the downloaded content of an entry.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     html_download_path = os.path.join(feed_path, "html")
     html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
     cleaned_download_path = os.path.join(feed_path, "cleaned")
@@ -182,7 +182,7 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     """
     Converts the cleaned content of an entry to an EPUB file.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
     epub_file_path_no_space = os.path.join(feed_path, f"{sanitize_filename(entry.get_file_name())}.epub")
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
@@ -210,7 +210,7 @@ def prepare_email(entry: Entry, feed: FeedItem):
     Prepares an email for sending by validating the EPUB file exists and entry hasn't been sent.
     Returns None if the email shouldn't be sent.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     
     if not os.path.exists(epub_file_path):
@@ -257,7 +257,7 @@ def send_email(entry: Entry, feed: FeedItem):
     """
     Sends an email with the EPUB file attached.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     if not os.path.exists(epub_file_path):
         logger.error(f"EPUB file not found: {epub_file_path}")
@@ -374,7 +374,7 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
     """
     Creates a single compiled ebook from multiple entries.
     """
-    feed_path = os.path.join(DOWNLOAD_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     compiled_epub_filename = f"{sanitize_filename(feed.title)}_compiled.epub"
     compiled_epub_path = os.path.join(feed_path, compiled_epub_filename)
         
