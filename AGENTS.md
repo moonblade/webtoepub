@@ -83,7 +83,6 @@ When `unprocessed_entries > ENTRY_THRESHOLD_FOR_NEW_BOOK`:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `FEEDURL` | Remote URL | Primary feed list source |
 | `DOWNLOAD_PATH` | `/feeds` | Storage for HTML, cleaned, EPUB, db.json |
 | `DEBUG_MODE` | `false` | Limits to 2 feeds, sets dry_run |
 | `MAX_BATCH_SIZE` | `20` | Fails batch if exceeded |
@@ -135,10 +134,16 @@ make build          # Build Docker image
 docker-compose up   # Run with compose
 ```
 
+## GIT WORKFLOW
+
+- **PRs**: Always create a new branch from `main` for all changes, then open PR
+- **Branch naming**: Use descriptive names like `remove-feedurl`, `add-site-cleaner`
+- **Commits**: Keep atomic, use lowercase imperative style
+
 ## GOTCHAS
 
 1. **Two DB systems**: `feeder.py` uses TinyDB (`db.json`), legacy `webtoepub.py` uses pickle (`completedObjects.db`)
 2. **Title sanitization**: `sanitize_filename()` exists in both `feeder.py` and `utils.py` - use utils version
-3. **Feed fallback**: Remote `FEEDURL` fails → falls back to `feed.input.json`
+3. **Feed fallback**: If DB empty after migration, falls back to `feed.input.json`
 4. **Compiled books**: All entries marked processed even if email fails
 5. **Royal Road TOC scrape**: Requires `<table id="chapters">` - breaks if RR changes layout
