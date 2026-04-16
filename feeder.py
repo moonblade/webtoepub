@@ -193,7 +193,8 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     extra_args = [
         '--metadata', f'title={entry.title}',
         '--metadata', 'lang=en-US',
-        '--css', "./epub.css"
+        '--css', "./epub.css",
+        '--epub-title-page=false'
     ]
 
     pypandoc.convert_file(
@@ -409,7 +410,8 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
             '--metadata', f'title={feed.title} - Complete',
             '--metadata', 'lang=en-US',
             '--css', "./epub.css",
-            '--toc-depth=1'
+            '--toc-depth=1',
+            '--epub-title-page=false'
         ]
         
         pypandoc.convert_file(
