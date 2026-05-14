@@ -20,6 +20,24 @@ MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "20"))
 ENTRY_THRESHOLD_FOR_NEW_BOOK = int(os.getenv("ENTRY_THRESHOLD_FOR_NEW_BOOK", "5"))
 logger = custom_logger(__name__)
 
+def normalize_royal_road_url(url: str) -> str:
+    """
+    Converts a Royal Road fiction page URL to its RSS syndication URL.
+    E.g. https://www.royalroad.com/fiction/140784/some-title
+      -> https://www.royalroad.com/fiction/syndication/140784
+    If the URL is already a syndication URL or not a Royal Road fiction URL,
+    it is returned unchanged.
+    """
+    # Already an RSS syndication URL
+    if "/fiction/syndication/" in url:
+        return url
+    # Match fiction page URL: /fiction/{id} or /fiction/{id}/slug
+    match = re.match(r'(https?://(?:www\.)?royalroad\.com)/fiction/(\d+)(?:/.*)?$', url)
+    if match:
+        base, fiction_id = match.groups()
+        return f"{base}/fiction/syndication/{fiction_id}"
+    return url
+
 with open("./keywords.txt", 'r') as file:
     KEYWORDS_TO_REMOVE = [line.strip() for line in file if line.strip()]
 
@@ -445,6 +463,7 @@ def process_feed_item(feed: FeedItem):
             return email_batch
 
         logger.debug(f"Processing feed - {feed.name}")
+        feed.url = normalize_royal_road_url(feed.url)
         feed_data = feedparser.parse(feed.url)
         feed.title = feed_data.feed.get("title", "")
         entries = feed_data.get("entries", [])

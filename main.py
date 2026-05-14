@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from datetime import datetime
 from utils import custom_logger
 import uvicorn
-from feeder import execute
+from feeder import execute, normalize_royal_road_url
 import asyncio
 from fastapi.templating import Jinja2Templates
 from models import FeedItem
@@ -138,6 +138,7 @@ async def api_add_feed(request: Request):
     if not name:
         return {"success": False, "message": "Name is required"}
     
+    url = normalize_royal_road_url(url)
     feed = FeedItem(name=name, url=url, ignore=ignore, dry_run=dry_run)
     success = add_feed(feed)
     
@@ -200,6 +201,7 @@ async def api_fetch_feed_title(request: Request):
     if not url:
         return {"success": False, "message": "URL is required"}
     
+    url = normalize_royal_road_url(url)
     try:
         parsed = feedparser.parse(url)
         if parsed.bozo and not parsed.entries:
