@@ -157,7 +157,7 @@ def clean_royal_road(html_content: str, keywords_to_remove: List[str]) -> str:
     extracted = False
     for para in chapter_div.find_all(["p", "div", "span"]):
         text = para.get_text().strip()
-        if "." in text and text.count(".") <= 3 and " " in text and text.count(" ") <= 25: #Check for . and space before count
+        if " " in text and text.count(" ") <= 25: #Check for space before count
             keywordsFound = 0
             for keyword in keywords_to_remove:
                 if keyword.lower() in text.lower():
