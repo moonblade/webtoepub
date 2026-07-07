@@ -449,8 +449,8 @@
                         </div>
                     </div>
                     <div class="item-actions">
-                        <button class="edit-btn" onclick="openEditDialog('{{ feed.url }}', '{{ feed.name }}', {{ 'true' if feed.ignore else 'false' }}, {{ 'true' if feed.dry_run else 'false' }})">Edit</button>
-                        <button class="delete-btn" onclick="openDeleteDialog('{{ feed.url }}', '{{ feed.name }}')">Delete</button>
+                        <button class="edit-btn" onclick="openEditDialog('{{ feed.url }}', '{{ feed.name | replace("'", "\\'") }}', {{ 'true' if feed.ignore else 'false' }}, {{ 'true' if feed.dry_run else 'false' }})">Edit</button>
+                        <button class="delete-btn" onclick="openDeleteDialog('{{ feed.url }}', '{{ feed.name | replace("'", "\\'") }}')">Delete</button>
                     </div>
                 </div>
             </li>
