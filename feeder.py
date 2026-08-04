@@ -2,7 +2,7 @@ import json
 import os
 import time
 from typing import List
-from db import add_entry, has_entry, get_all_feeds, migrate_feeds_from_json
+from db import add_entry, has_entry, get_all_feeds, migrate_feeds_from_json, update_feed
 from models import EmailBatch, Entry, EntryType, Feed, FeedItem
 import feedparser
 import requests
@@ -544,6 +544,13 @@ def process_feed_item(feed: FeedItem):
                     logger.exception(f"Error processing entry: {e}")
     except Exception as e:
         logger.exception(f"Error processing feed {feed.name}: {e}")
+
+    # one_shot: after a successful run that produced output, auto-ignore the feed
+    if feed.one_shot and email_batch:
+        logger.info(f"one_shot feed '{feed.name}' processed. Setting ignore=True until manually re-enabled.")
+        feed.ignore = True
+        update_feed(feed.url, {"ignore": True})
+
     return email_batch
 
 def process_feed(feed: Feed):

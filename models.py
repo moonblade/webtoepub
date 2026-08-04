@@ -13,6 +13,7 @@ class FeedItem(BaseModel):
     url: str
     ignore: Optional[bool] = False
     dry_run: Optional[bool] = False
+    one_shot: Optional[bool] = False  # Process once then auto-set ignore=True
 
 class Feed(BaseModel):
     feeds: list[FeedItem]

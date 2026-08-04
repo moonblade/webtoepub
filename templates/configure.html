@@ -139,6 +139,11 @@
             color: var(--primary);
         }
 
+        .badge.one-shot {
+            background-color: rgba(3, 169, 244, 0.3);
+            color: #03a9f4;
+        }
+
         .item-actions {
             display: flex;
             gap: 8px;
@@ -175,8 +180,24 @@
             background-color: #b00020;
         }
 
+        .run-btn {
+            background-color: #03a9f4;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .run-btn:hover {
+            background-color: #0288d1;
+        }
+
         .delete-btn:disabled,
-        .edit-btn:disabled {
+        .edit-btn:disabled,
+        .run-btn:disabled {
             background-color: #555;
             cursor: not-allowed;
             border-color: #555;
@@ -446,10 +467,16 @@
                             {% if feed.dry_run %}
                             <span class="badge dry-run">Dry Run</span>
                             {% endif %}
+                            {% if feed.one_shot %}
+                            <span class="badge one-shot">One Shot</span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="item-actions">
-                        <button class="edit-btn" onclick="openEditDialog('{{ feed.url }}', '{{ feed.name | replace("'", "\\'") }}', {{ 'true' if feed.ignore else 'false' }}, {{ 'true' if feed.dry_run else 'false' }})">Edit</button>
+                        {% if feed.one_shot and feed.ignore %}
+                        <button class="run-btn" onclick="runOneShot('{{ feed.url }}', '{{ feed.name | replace("'", "\\'") }}')">Run Now</button>
+                        {% endif %}
+                        <button class="edit-btn" onclick="openEditDialog('{{ feed.url }}', '{{ feed.name | replace("'", "\\'") }}', {{ 'true' if feed.ignore else 'false' }}, {{ 'true' if feed.dry_run else 'false' }}, {{ 'true' if feed.one_shot else 'false' }})">Edit</button>
                         <button class="delete-btn" onclick="openDeleteDialog('{{ feed.url }}', '{{ feed.name | replace("'", "\\'") }}')">Delete</button>
                     </div>
                 </div>
@@ -492,6 +519,12 @@
                     <div class="form-group checkbox-group">
                         <input type="checkbox" id="feedDryRun" name="dry_run">
                         <label for="feedDryRun">Dry run mode</label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="feedOneShot" name="one_shot">
+                        <label for="feedOneShot">One shot (process once, then auto-ignore)</label>
                     </div>
                 </div>
                 
@@ -543,11 +576,12 @@
             document.getElementById('feedName').value = '';
             document.getElementById('feedIgnore').checked = false;
             document.getElementById('feedDryRun').checked = false;
+            document.getElementById('feedOneShot').checked = false;
             document.getElementById('submitBtn').textContent = 'Add';
             document.getElementById('feedDialog').classList.add('active');
         }
 
-        function openEditDialog(url, name, ignore, dryRun) {
+        function openEditDialog(url, name, ignore, dryRun, oneShot) {
             document.getElementById('dialogTitle').textContent = 'Edit Feed';
             document.getElementById('formMode').value = 'edit';
             document.getElementById('originalUrl').value = url;
@@ -556,6 +590,7 @@
             document.getElementById('feedName').value = name;
             document.getElementById('feedIgnore').checked = ignore;
             document.getElementById('feedDryRun').checked = dryRun;
+            document.getElementById('feedOneShot').checked = oneShot || false;
             document.getElementById('submitBtn').textContent = 'Save';
             document.getElementById('feedDialog').classList.add('active');
         }
@@ -632,7 +667,8 @@
                 url: mode === 'edit' ? originalUrl : document.getElementById('feedUrl').value.trim(),
                 name: document.getElementById('feedName').value.trim(),
                 ignore: document.getElementById('feedIgnore').checked,
-                dry_run: document.getElementById('feedDryRun').checked
+                dry_run: document.getElementById('feedDryRun').checked,
+                one_shot: document.getElementById('feedOneShot').checked
             };
             
             submitBtn.disabled = true;
@@ -660,6 +696,35 @@
                 showToast('An error occurred', 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = mode === 'add' ? 'Add' : 'Save';
+            }
+        }
+
+        async function runOneShot(url, name) {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            try {
+                const response = await fetch('/api/feeds/run-one-shot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(`Run triggered for "${name}". Feed will auto-ignore when done.`, 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    showToast(result.message || 'Run failed', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Run Now';
+                }
+            } catch (error) {
+                showToast('An error occurred', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Run Now';
             }
         }
 

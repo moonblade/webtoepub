@@ -1,13 +1,14 @@
 import logging
 import os
 import re
-from db import get_entries, get_all_feeds, add_feed, update_feed, delete_feed, migrate_feeds_from_json
+from db import get_entries, get_all_feeds, get_feed_by_url, add_feed, update_feed, delete_feed, migrate_feeds_from_json
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from datetime import datetime
 from utils import custom_logger
 import uvicorn
-from feeder import execute, normalize_royal_road_url
+from feeder import execute, normalize_royal_road_url, process_feed_item
+from models import Feed
 import asyncio
 from fastapi.templating import Jinja2Templates
 from models import FeedItem
@@ -132,6 +133,7 @@ async def api_add_feed(request: Request):
     name = data.get("name", "").strip()
     ignore = data.get("ignore", False)
     dry_run = data.get("dry_run", False)
+    one_shot = data.get("one_shot", False)
     
     if not url:
         return {"success": False, "message": "URL is required"}
@@ -139,7 +141,7 @@ async def api_add_feed(request: Request):
         return {"success": False, "message": "Name is required"}
     
     url = normalize_royal_road_url(url)
-    feed = FeedItem(name=name, url=url, ignore=ignore, dry_run=dry_run)
+    feed = FeedItem(name=name, url=url, ignore=ignore, dry_run=dry_run, one_shot=one_shot)
     success = add_feed(feed)
     
     if success:
@@ -162,6 +164,8 @@ async def api_update_feed(request: Request):
         updates["ignore"] = data["ignore"]
     if "dry_run" in data:
         updates["dry_run"] = data["dry_run"]
+    if "one_shot" in data:
+        updates["one_shot"] = data["one_shot"]
     
     if not updates:
         return {"success": False, "message": "No updates provided"}
@@ -216,6 +220,36 @@ async def api_fetch_feed_title(request: Request):
     except Exception as e:
         logger.error(f"Error fetching feed title: {e}")
         return {"success": False, "message": "Failed to fetch feed"}
+
+@app.post("/api/feeds/run-one-shot")
+async def api_run_one_shot(request: Request):
+    """
+    Re-enables a one_shot feed (clears ignore) and immediately processes it.
+    After processing, the feed will auto-ignore itself again if it produces output.
+    """
+    data = await request.json()
+    url = data.get("url", "").strip()
+
+    if not url:
+        return {"success": False, "message": "URL is required"}
+
+    feed_item = get_feed_by_url(url)
+    if not feed_item:
+        return {"success": False, "message": "Feed not found"}
+
+    if not feed_item.one_shot:
+        return {"success": False, "message": "Feed is not a one_shot feed"}
+
+    # Clear ignore so this run proceeds
+    update_feed(url, {"ignore": False})
+    feed_item.ignore = False
+
+    # Process only this feed in a background thread
+    feed_wrapper = Feed(feeds=[feed_item])
+    await asyncio.to_thread(lambda: __import__('feeder').process_feed(feed_wrapper))
+
+    return {"success": True, "message": f"one_shot run triggered for '{feed_item.name}'"}
+
 
 # @app.on_event("startup")
 # async def startup_event():
