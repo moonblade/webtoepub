@@ -422,7 +422,7 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
             compiled_file.write("</body></html>")
         
         # Convert the combined HTML to EPUB
-        compiled_epub_path_no_space = os.path.join(feed_path, f"{feed.title.replace(' ', '_')}_compiled.epub")
+        compiled_epub_path_no_space = os.path.join(feed_path, f"{sanitize_filename(feed.title).replace(' ', '_')}_compiled.epub")
         
         extra_args = [
             '--metadata', f'title={feed.title} - Complete',
