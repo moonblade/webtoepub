@@ -394,21 +394,18 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
     """
     Creates a single compiled ebook from multiple entries.
 
-    Memory-efficient approach: convert each chapter HTML → EPUB via Pandoc,
-    immediately read the XHTML content into ebooklib, then delete the chunk
-    file before moving to the next chapter. Only one chunk file exists on
-    disk at a time. The ebooklib EpubBook accumulates chapter content objects
-    in memory, but each is just the XHTML text of one chapter — far smaller
-    than holding full Pandoc processes or hundreds of EPUB zip files open.
+    Builds the EPUB directly from cleaned HTML using ebooklib — no intermediate
+    Pandoc EPUB per chapter. This avoids the 3x XHTML inflation Pandoc causes
+    (nav + section wrapper + content per chapter) which was producing 1515
+    items for a 505-chapter book and causing Amazon's converter to fail.
+
+    Memory stays low because we read each cleaned HTML file one at a time.
     """
     feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     compiled_epub_filename = f"{sanitize_filename(feed.title)}_compiled.epub"
     compiled_epub_path = os.path.join(feed_path, compiled_epub_filename)
 
     logger.info(f"Creating compiled ebook for {feed.title} with {len(entries)} chapters")
-
-    chunk_dir = os.path.join(feed_path, "compiled_chunks")
-    os.makedirs(chunk_dir, exist_ok=True)
 
     merged = epub.EpubBook()
     merged.set_identifier(f"compiled-{sanitize_filename(feed.title)}")
@@ -417,7 +414,6 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
 
     spine = ['nav']
     toc = []
-    item_counter = 0
     chapters_added = 0
 
     try:
@@ -427,61 +423,48 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
                 logger.warning(f"Cleaned HTML not found for entry: {entry.title}")
                 continue
 
-            chunk_html_path = os.path.join(chunk_dir, "chunk.html")
-            chunk_epub_path = os.path.join(chunk_dir, "chunk.epub")
-            chunk_epub_tmp  = os.path.join(chunk_dir, "chunk_tmp.epub")
-
             try:
-                # Wrap with chapter heading
-                with open(cleaned_html_path, "r") as f:
-                    content = f.read()
-                with open(chunk_html_path, "w") as f:
-                    f.write(f"<html><body><h1>{entry.title}</h1>\n{content}\n</body></html>")
+                with open(cleaned_html_path, "r", encoding="utf-8", errors="replace") as f:
+                    body_content = f.read()
 
-                # Convert single chapter HTML → EPUB (one Pandoc call, low memory)
-                pypandoc.convert_file(
-                    chunk_html_path,
-                    'epub',
-                    outputfile=chunk_epub_tmp,
-                    extra_args=['--metadata', f'title={entry.title}', '--metadata', 'lang=en-US']
+                chap_id   = f"chap_{i+1:05d}"
+                chap_name = f"chap_{i+1:05d}.xhtml"
+
+                # Wrap in minimal valid XHTML with chapter heading
+                xhtml = (
+                    "<?xml version='1.0' encoding='utf-8'?>"
+                    "<!DOCTYPE html>"
+                    '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">'
+                    "<head>"
+                    f"<title>{entry.title}</title>"
+                    '<meta charset="utf-8"/>'
+                    "</head>"
+                    "<body>"
+                    f"<h1>{entry.title}</h1>"
+                    f"{body_content}"
+                    "</body></html>"
                 )
-                os.rename(chunk_epub_tmp, chunk_epub_path)
 
-                # Read XHTML content from the chunk and add to merged book
-                book = epub.read_epub(chunk_epub_path)
-                for item in book.get_items():
-                    if not isinstance(item, epub.EpubHtml):
-                        continue
-                    item_counter += 1
-                    new_id   = f"chap_{item_counter:05d}"
-                    new_name = f"chap_{item_counter:05d}.xhtml"
-                    chapter  = epub.EpubHtml(
-                        title=entry.title,
-                        file_name=new_name,
-                        uid=new_id,
-                        lang='en'
-                    )
-                    chapter.content = item.get_content()
-                    merged.add_item(chapter)
-                    spine.append(chapter)
-                    toc.append(epub.Link(new_name, entry.title, new_id))
-                    chapters_added += 1
+                chapter = epub.EpubHtml(
+                    title=entry.title,
+                    file_name=chap_name,
+                    uid=chap_id,
+                    lang='en'
+                )
+                chapter.content = xhtml.encode('utf-8')
+                merged.add_item(chapter)
+                spine.append(chapter)
+                toc.append(epub.Link(chap_name, entry.title, chap_id))
+                chapters_added += 1
 
             except Exception as e:
-                logger.warning(f"Failed to process chapter {entry.title}: {e}")
-            finally:
-                # Delete chunk files immediately — never accumulate on disk
-                for p in (chunk_html_path, chunk_epub_path, chunk_epub_tmp):
-                    try:
-                        os.remove(p)
-                    except Exception:
-                        pass
+                logger.warning(f"Failed to add chapter {entry.title}: {e}")
 
         if chapters_added == 0:
             logger.error("No chapters added to compiled ebook, aborting.")
             return None
 
-        logger.info(f"Merged {chapters_added} chapters, writing final EPUB...")
+        logger.info(f"Added {chapters_added} chapters, writing final EPUB...")
 
         merged.toc = toc
         merged.add_item(epub.EpubNcx())
@@ -496,11 +479,6 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
     except Exception as e:
         logger.exception(f"Error creating compiled ebook: {e}")
         return None
-    finally:
-        try:
-            os.rmdir(chunk_dir)
-        except Exception:
-            pass
 
 def process_feed_item(feed: FeedItem):
     """
