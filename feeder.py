@@ -449,7 +449,9 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
 
                 # Read XHTML content from the chunk and add to merged book
                 book = epub.read_epub(chunk_epub_path)
-                for item in book.get_items_of_type(epub.ITEM_DOCUMENT):
+                for item in book.get_items():
+                    if not isinstance(item, epub.EpubHtml):
+                        continue
                     item_counter += 1
                     new_id   = f"chap_{item_counter:05d}"
                     new_name = f"chap_{item_counter:05d}.xhtml"
