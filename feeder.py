@@ -12,6 +12,7 @@ from utils import custom_logger
 from mail import send_gmail
 import pypandoc
 import re
+from ebooklib import epub
 
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DATA_PATH = os.getenv("DATA_PATH", "/data")
@@ -392,65 +393,112 @@ def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, s
 def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
     """
     Creates a single compiled ebook from multiple entries.
+
+    Instead of concatenating all chapters into one giant HTML and passing it
+    to Pandoc (which loads everything into memory at once), we:
+      1. Convert each chapter's cleaned HTML to a small intermediate EPUB via
+         Pandoc (one at a time, low memory).
+      2. Merge all those per-chapter EPUBs into one final EPUB using ebooklib
+         (streaming reads, no full-book HTML in memory).
     """
     feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     compiled_epub_filename = f"{sanitize_filename(feed.title)}_compiled.epub"
     compiled_epub_path = os.path.join(feed_path, compiled_epub_filename)
-        
+
     logger.info(f"Creating compiled ebook for {feed.title} with {len(entries)} chapters")
-    
-    # Create a combined HTML file with chapter titles
-    compiled_html_path = os.path.join(feed_path, "compiled_temp.html")
-    
+
+    chunk_dir = os.path.join(feed_path, "compiled_chunks")
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    chunk_paths = []
     try:
-        with open(compiled_html_path, "w") as compiled_file:
-            compiled_file.write("<html><body>\n")
-            
-            # Entries should already be in oldest-first order
-            for entry in entries:
-                cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
-                if os.path.exists(cleaned_html_path):
-                    # Add chapter title as h1 heading
-                    compiled_file.write(f"<h1>{entry.title}</h1>\n")
-                    
-                    # Read and append chapter content
-                    with open(cleaned_html_path, "r") as chapter_file:
-                        chapter_content = chapter_file.read()
-                        compiled_file.write(chapter_content)
-                        compiled_file.write("\n")
-            
-            compiled_file.write("</body></html>")
-        
-        # Convert the combined HTML to EPUB
-        compiled_epub_path_no_space = os.path.join(feed_path, f"{sanitize_filename(feed.title).replace(' ', '_')}_compiled.epub")
-        
-        extra_args = [
-            '--metadata', f'title={feed.title} - Complete',
-            '--metadata', 'lang=en-US',
-            '--css', "./epub.css",
-            '--toc-depth=1',
-            '--epub-title-page=false'
-        ]
-        
-        pypandoc.convert_file(
-            compiled_html_path,
-            'epub',
-            outputfile=compiled_epub_path_no_space,
-            extra_args=extra_args
-        )
-        os.rename(compiled_epub_path_no_space, compiled_epub_path)
-        
-        # Clean up temporary file
-        os.remove(compiled_html_path)
-        
+        # Step 1: convert each chapter to its own small EPUB
+        for i, entry in enumerate(entries):
+            cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
+            if not os.path.exists(cleaned_html_path):
+                logger.warning(f"Cleaned HTML not found for entry: {entry.title}")
+                continue
+
+            chunk_html_path = os.path.join(chunk_dir, f"chunk_{i:05d}.html")
+            chunk_epub_path = os.path.join(chunk_dir, f"chunk_{i:05d}.epub")
+
+            # Wrap with chapter heading
+            with open(cleaned_html_path, "r") as f:
+                content = f.read()
+            with open(chunk_html_path, "w") as f:
+                f.write(f"<html><body><h1>{entry.title}</h1>\n{content}\n</body></html>")
+
+            chunk_epub_path_tmp = os.path.join(chunk_dir, f"chunk_{i:05d}_tmp.epub")
+            pypandoc.convert_file(
+                chunk_html_path,
+                'epub',
+                outputfile=chunk_epub_path_tmp,
+                extra_args=['--metadata', f'title={entry.title}', '--metadata', 'lang=en-US']
+            )
+            os.rename(chunk_epub_path_tmp, chunk_epub_path)
+            os.remove(chunk_html_path)
+            chunk_paths.append(chunk_epub_path)
+
+        if not chunk_paths:
+            logger.error("No chunks created, aborting compiled ebook.")
+            return None
+
+        logger.info(f"Created {len(chunk_paths)} chapter EPUBs, merging...")
+
+        # Step 2: merge all per-chapter EPUBs into one using ebooklib
+        merged = epub.EpubBook()
+        merged.set_identifier(f"compiled-{sanitize_filename(feed.title)}")
+        merged.set_title(f"{feed.title} - Complete")
+        merged.set_language("en")
+
+        spine = ['nav']
+        toc = []
+        item_counter = 0
+
+        for chunk_path in chunk_paths:
+            try:
+                book = epub.read_epub(chunk_path)
+                for item in book.get_items_of_type(epub.ITEM_DOCUMENT):
+                    item_counter += 1
+                    new_id = f"chap_{item_counter:05d}"
+                    new_name = f"chap_{item_counter:05d}.xhtml"
+                    chapter = epub.EpubHtml(
+                        title=item.title or new_id,
+                        file_name=new_name,
+                        uid=new_id,
+                        lang='en'
+                    )
+                    chapter.content = item.get_content()
+                    merged.add_item(chapter)
+                    spine.append(chapter)
+                    toc.append(epub.Link(new_name, item.title or new_id, new_id))
+            except Exception as e:
+                logger.warning(f"Failed to read chunk {chunk_path}: {e}")
+
+        merged.toc = toc
+        merged.add_item(epub.EpubNcx())
+        merged.add_item(epub.EpubNav())
+        merged.spine = spine
+
+        epub.write_epub(compiled_epub_path, merged)
+
         logger.info(f"Compiled EPUB file saved to {compiled_epub_path}")
         return compiled_epub_path
+
     except Exception as e:
         logger.exception(f"Error creating compiled ebook: {e}")
-        # Clean up temporary file on error
-        if os.path.exists(compiled_html_path):
-            os.remove(compiled_html_path)
         return None
+    finally:
+        # Clean up chunk files
+        for p in chunk_paths:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+        try:
+            os.rmdir(chunk_dir)
+        except Exception:
+            pass
 
 def process_feed_item(feed: FeedItem):
     """
