@@ -3,6 +3,10 @@ output/
 feeds/
 books/
 
+# Local run data (make run)
+data/
+config/
+
 # Database files
 completed.db
 completedObjects.db

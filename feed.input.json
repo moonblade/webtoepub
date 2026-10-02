@@ -33,7 +33,7 @@
         "url": "https://www.royalroad.com/fiction/syndication/41618"
       },
       {
-        "name": "Path of ascension",
+        "name": "The Path of Ascension",
         "ignore": true,
         "url": "https://www.royalroad.com/fiction/syndication/40920"
       },
@@ -46,7 +46,7 @@
         "url": "https://www.royalroad.com/fiction/syndication/68679"
       },
       {
-        "name": "heretical fishing",
+        "name": "Heretical Fishing: A Cozy Guide to Annoying the Cults, Outsmarting the Fish, and Alienating Oneself",
         "ignore": true,
         "url": "https://www.royalroad.com/fiction/syndication/67114"
       },
@@ -79,29 +79,48 @@
           "url": "https://www.royalroad.com/fiction/syndication/92144"
       },
       {
-          "name": "Practical guide to sorcery",
+          "name": "A Practical Guide to Sorcery",
           "url": "https://www.royalroad.com/fiction/syndication/34009"
-          
-      },
-      {
-          "name": "Primal Hunter",
-          "url": "https://www.royalroad.com/fiction/syndication/36049"
-      },
-      {
-          "name": "The perfect run",
-          "url": "https://www.royalroad.com/fiction/syndication/36735"
-      },
-      {
-          "name": "12 miles below",
-          "url": "https://www.royalroad.com/fiction/syndication/42367"
-      },
-      {
-          "name": "rise of the living forge",
-          "url": "https://www.royalroad.com/fiction/syndication/79094"
       },
       {
           "name": "nightmare realm summoner",
-          "url": "https://www.royalroad.com/fiction/syndication/89034"   
+          "url": "https://www.royalroad.com/fiction/syndication/89034"
+      },
+      {
+          "name": "The Hundred Reigns",
+          "url": "https://www.royalroad.com/fiction/syndication/139212"
+      },
+      {
+          "name": "The Archmage Coefficient (OP Archmage/ Mage Academy/ LITRPG/ Hidden Genius)",
+          "url": "https://www.royalroad.com/fiction/syndication/156215"
+      },
+      {
+          "name": "Throne of Time",
+          "url": "https://www.royalroad.com/fiction/syndication/172653"
+      },
+      {
+          "name": "The Years of Apocalypse",
+          "url": "https://www.royalroad.com/fiction/syndication/81002"
+      },
+      {
+          "name": "Bog Standard Isekai",
+          "url": "https://www.royalroad.com/fiction/syndication/69512"
+      },
+      {
+          "name": "The Primal Hunter",
+          "url": "https://www.royalroad.com/fiction/syndication/36049"
+      },
+      {
+          "name": "The Perfect Run",
+          "url": "https://www.royalroad.com/fiction/syndication/36735"
+      },
+      {
+          "name": "12 Miles Below",
+          "url": "https://www.royalroad.com/fiction/syndication/42367"
+      },
+      {
+          "name": "Rise of the Living Forge",
+          "url": "https://www.royalroad.com/fiction/syndication/79094"
       }
     ]
 }

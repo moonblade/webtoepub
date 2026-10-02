@@ -2,7 +2,7 @@ import json
 import os
 import time
 from typing import List
-from db import add_entry, has_entry, get_all_feeds, migrate_feeds_from_json, update_feed
+from db import add_entry, has_entry, sync_from_imap, get_all_feeds, migrate_feeds_from_json, update_feed
 from models import EmailBatch, Entry, EntryType, Feed, FeedItem
 import feedparser
 import requests
@@ -48,11 +48,11 @@ def get_feed_list() -> Feed:
     On first run, migrates from feed.input.json if the feeds table is empty.
     """
     migrate_feeds_from_json()
-    
+
     feeds = get_all_feeds()
     if feeds:
         return Feed(feeds=feeds, dry_run=DEBUG_MODE)
-    
+
     # Fallback to local JSON if DB is empty and migration failed
     logger.warn("No feeds in database, falling back to feed.input.json")
     with open("./feed.input.json", 'r') as file:
@@ -78,13 +78,13 @@ def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
     try:
         if not os.path.exists(html_file_path):
             return False
-        
+
         with open(html_file_path, "r") as f:
             html_content = f.read()
-        
+
         soup = BeautifulSoup(html_content, "lxml")
         patreon_div = soup.find("div", class_="patreon-protected-post")
-        
+
         if patreon_div:
             logger.info(f"Entry {entry.title} is patreon-locked")
             return True
@@ -92,6 +92,12 @@ def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
     except Exception as e:
         logger.exception(f"Error checking patreon lock: {e}")
         return False
+
+
+def _make_session() -> HTMLSession:
+    """Create an HTMLSession for downloading chapter content."""
+    return HTMLSession()
+
 
 def download(entry: Entry, feed: FeedItem):
     """
@@ -105,7 +111,7 @@ def download(entry: Entry, feed: FeedItem):
     if os.path.exists(html_file_path):
         return
     logger.info(f"Downloading content from {entry.link} to {html_file_path}")
-    session = HTMLSession()
+    session = _make_session()
     response = session.get(entry.link)
     response.raise_for_status()
     with open(html_file_path, "w") as f:
@@ -236,7 +242,7 @@ def prepare_email(entry: Entry, feed: FeedItem):
     if not os.path.exists(epub_file_path):
         logger.error(f"EPUB file not found: {epub_file_path}")
         return None
-    if has_entry(entry):
+    if has_entry(entry, feed_title=feed.title):
         return None
     return EmailBatch(entry=entry, feed=feed, epub_path=epub_file_path)
 
@@ -266,7 +272,7 @@ def send_batch_emails(email_batch: List[EmailBatch], feed: Feed):
         for batch in email_batch:
             logger.info(f"Sending email with EPUB file: {batch.epub_path}")
             send_gmail(
-                subject=f"{batch.feed.title} - {batch.entry.title}",
+                subject=f"{batch.feed.title} - {batch.entry.title} | {batch.entry.link}",
                 content=f"EPUB file for {batch.entry.title} is attached.",
                 attachment_path=batch.epub_path
             )
@@ -282,7 +288,7 @@ def send_email(entry: Entry, feed: FeedItem):
     if not os.path.exists(epub_file_path):
         logger.error(f"EPUB file not found: {epub_file_path}")
         return
-    if has_entry(entry):
+    if has_entry(entry, feed_title=feed.title):
         return
     if feed.dry_run:
         logger.info(f"DRY RUN: Would have sent email with EPUB file: {epub_file_path}")
@@ -312,8 +318,8 @@ def get_royal_road_chapters(feed_url: str) -> List[Entry]:
         fiction_url = f"https://www.royalroad.com/fiction/{fiction_id}"
         
         logger.info(f"Scraping Royal Road table of contents from {fiction_url}")
-        
-        session = HTMLSession()
+
+        session = _make_session()
         response = session.get(fiction_url)
         response.raise_for_status()
         
@@ -373,7 +379,7 @@ def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, s
             if entry.ignore():
                 logger.info(f"Ignoring entry: {entry.title}")
                 return
-            if has_entry(entry):
+            if has_entry(entry, feed_title=feed.title):
                 return
         if not skip_date:
             entry.title = entry.get_date() + " - " + entry.title
@@ -501,7 +507,7 @@ def process_feed_item(feed: FeedItem):
         for entry in entries:
             try:
                 entry = Entry(**entry)
-                if not has_entry(entry):
+                if not has_entry(entry, feed_title=feed.title):
                     unprocessed_entries.append(entry)
             except Exception as e:
                 logger.exception(f"Error checking entry: {e}")
@@ -519,7 +525,7 @@ def process_feed_item(feed: FeedItem):
                 all_chapters = get_royal_road_chapters(feed.url)
                 if all_chapters:
                     # Filter to only unprocessed chapters and reverse to get oldest first
-                    unprocessed_entries = [entry for entry in all_chapters if not has_entry(entry)]
+                    unprocessed_entries = [entry for entry in all_chapters if not has_entry(entry, feed_title=feed.title)]
                     logger.info(f"Found {len(unprocessed_entries)} unprocessed chapters from Royal Road TOC")
                     
                     # If TOC has no unprocessed entries, mark original RSS entries as processed to avoid reprocessing
@@ -603,48 +609,11 @@ def execute():
         logger.error(f"Test file not found: {test_file}")
         return
     logger.info("Feed processing started.")
+    # Sync sent emails into TinyDB once up-front so has_entry() never
+    # needs to hit IMAP during the feed processing loop.
+    sync_from_imap()
     feed = get_feed_list()
     process_feed(feed)
 
 if __name__ == "__main__":
-    import csv
-    
-    # Read entries from CSV file
-    csv_path = "/tmp/chapters9.csv"
-    entries = []
-    
-    with open(csv_path, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            entry = Entry(
-                title=row['chapter_number'],
-                link=row['link'],
-                entryType=EntryType.wanderinginn,
-                published_parsed=time.localtime()
-            )
-            entries.append(entry)
-    
-    logger.info(f"Loaded {len(entries)} entries from CSV")
-    
-    # Create test feed
-    feed_item = FeedItem(
-        name="The Wandering Inn Test",
-        title="The Wandering Inn",
-        url="https://wanderinginn.com/feed/",
-        dry_run=True
-    )
-    
-    # Process all entries (skip email prep since we want compiled output)
-    for entry in entries:
-        try:
-            process_entry(entry, feed_item, skip_email_prep=True, skip_date=True)
-        except Exception as e:
-            logger.exception(f"Error processing entry: {e}")
-    
-    # Create compiled ebook
-    compiled_epub_path = create_compiled_ebook(entries, feed_item)
-    
-    if compiled_epub_path:
-        logger.info(f"Compiled ebook created at: {compiled_epub_path}")
-    else:
-        logger.error("Failed to create compiled ebook")
+    execute()
