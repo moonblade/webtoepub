@@ -72,8 +72,11 @@ def sanitize_filename(filename: str) -> str:
 
 def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
     """
-    Checks if the downloaded HTML file contains a patreon-protected-post div.
-    Returns True if the content is patreon-locked.
+    Checks if the downloaded HTML file contains a patreon gate.
+
+    Detects two patterns TWI has used:
+    1. A <div class="patreon-protected-post"> block (current style)
+    2. A title containing "Patron Early Access:" (legacy style, now also in models.py)
     """
     try:
         if not os.path.exists(html_file_path):
@@ -83,11 +86,20 @@ def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
             html_content = f.read()
 
         soup = BeautifulSoup(html_content, "lxml")
-        patreon_div = soup.find("div", class_="patreon-protected-post")
 
-        if patreon_div:
-            logger.info(f"Entry {entry.title} is patreon-locked")
+        # Current TWI gate: div with class patreon-protected-post
+        if soup.find("div", class_="patreon-protected-post"):
+            logger.info(f"Entry {entry.title} is patreon-locked (patreon-protected-post div)")
             return True
+
+        # Fallback: check for "Patreon Exclusive" heading inside the post content
+        content_div = soup.find("div", class_="elementor-widget-theme-post-content")
+        if content_div:
+            text = content_div.get_text(separator=" ", strip=True)
+            if "Patreon Exclusive" in text or "Patron Early Access" in text:
+                logger.info(f"Entry {entry.title} is patreon-locked (patreon text in content)")
+                return True
+
         return False
     except Exception as e:
         logger.exception(f"Error checking patreon lock: {e}")
@@ -108,16 +120,17 @@ def download(entry: Entry, feed: FeedItem):
     os.makedirs(feed_path, exist_ok=True)
     os.makedirs(html_download_path, exist_ok=True)
     html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
-    if os.path.exists(html_file_path):
-        return
-    logger.info(f"Downloading content from {entry.link} to {html_file_path}")
-    session = _make_session()
-    response = session.get(entry.link)
-    response.raise_for_status()
-    with open(html_file_path, "w") as f:
-        f.write(response.html.html)
-    logger.info(f"Downloaded content {html_file_path}")
-    
+    if not os.path.exists(html_file_path):
+        logger.info(f"Downloading content from {entry.link} to {html_file_path}")
+        session = _make_session()
+        response = session.get(entry.link)
+        response.raise_for_status()
+        with open(html_file_path, "w") as f:
+            f.write(response.html.html)
+        logger.info(f"Downloaded content {html_file_path}")
+
+    # Always check for patreon lock, even on cached files — TWI may add the gate
+    # to a previously-free chapter after the initial download.
     if is_patreon_locked(entry, html_file_path):
         entry.set_patreon_lock()
         add_entry(entry, feed)
@@ -190,6 +203,14 @@ def clean(entry: Entry, feed: FeedItem):
     os.makedirs(cleaned_download_path, exist_ok=True)
     if os.path.exists(cleaned_file_path):
         return
+    # Guard: re-check for patreon lock before cleaning (catches cached HTML that
+    # was gated after initial download but before clean() ran).
+    if is_patreon_locked(entry, html_file_path):
+        entry.set_patreon_lock()
+        add_entry(entry, feed)
+        os.remove(html_file_path)
+        logger.info(f"Removed patreon-locked file during clean: {html_file_path}")
+        raise ValueError(f"Entry {entry.title} is patreon-locked; skipping clean.")
     logger.info(f"Cleaning content from {html_file_path}")
     with open(html_file_path, "r") as f:
         html_content = f.read()
