@@ -202,6 +202,11 @@ def clean_wandering_inn(html_content: str) -> str:
 
     return entry_content.prettify()
 
+_RR_INLINE_WATERMARKS = [
+    "love this story? find the genuine version on the author's preferred platform and support their work",
+    "support the creativity of authors by visiting the original site for this novel and more",
+]
+
 def clean_royal_road(html_content: str, keywords_to_remove: List[str]) -> str:
     """
     Cleans the downloaded content of a Royal Road entry.
@@ -211,6 +216,19 @@ def clean_royal_road(html_content: str, keywords_to_remove: List[str]) -> str:
     if not chapter_div:
         print("Could not find the chapter content div")
         return ""
+
+    # Remove inline anti-piracy watermark spans injected by Royal Road.
+    # These appear as <span> (or <p>) elements whose text matches known phrases,
+    # regardless of the obfuscated class name used.
+    removed_watermarks = 0
+    for el in chapter_div.find_all(["p", "span", "div"]):
+        text = el.get_text(separator=" ").strip().lower()
+        if any(wm in text for wm in _RR_INLINE_WATERMARKS):
+            logger.info(f"Removed inline RR watermark: {el.get_text(separator=' ').strip()[:80]}")
+            el.extract()
+            removed_watermarks += 1
+    if removed_watermarks:
+        logger.info(f"Stripped {removed_watermarks} inline watermark(s)")
 
     extracted = False
     for para in chapter_div.find_all(["p", "div", "span"]):
