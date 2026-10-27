@@ -156,6 +156,10 @@ def download(entry: Entry, feed: FeedItem):
     os.makedirs(feed_path, exist_ok=True)
     os.makedirs(html_download_path, exist_ok=True)
     html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
+    MIN_HTML_BYTES = 20_000  # Real RR/TWI pages are 80KB+; Anubis challenge is ~8KB
+    if os.path.exists(html_file_path) and os.path.getsize(html_file_path) < MIN_HTML_BYTES:
+        logger.warning(f"Cached HTML too small ({os.path.getsize(html_file_path)}B), re-downloading: {html_file_path}")
+        os.remove(html_file_path)
     if not os.path.exists(html_file_path):
         logger.info(f"Downloading content from {entry.link} to {html_file_path}")
         html = _download_html(entry.link)
@@ -235,8 +239,11 @@ def clean(entry: Entry, feed: FeedItem):
     cleaned_download_path = os.path.join(feed_path, "cleaned")
     cleaned_file_path = os.path.join(cleaned_download_path, f"{sanitize_filename(entry.title)}.html")
     os.makedirs(cleaned_download_path, exist_ok=True)
-    if os.path.exists(cleaned_file_path):
+    if os.path.exists(cleaned_file_path) and os.path.getsize(cleaned_file_path) > 500:
         return
+    elif os.path.exists(cleaned_file_path):
+        logger.warning(f"Cleaned file too small ({os.path.getsize(cleaned_file_path)}B), re-cleaning: {cleaned_file_path}")
+        os.remove(cleaned_file_path)
     # Guard: re-check for patreon lock before cleaning (catches cached HTML that
     # was gated after initial download but before clean() ran).
     if is_patreon_locked(entry, html_file_path):
@@ -266,8 +273,12 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
     cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
     epub_file_path_no_space = os.path.join(feed_path, f"{sanitize_filename(entry.get_file_name())}.epub")
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
+    MIN_EPUB_BYTES = 6_000
     if os.path.exists(epub_file_path):
-        return
+        if os.path.getsize(epub_file_path) >= MIN_EPUB_BYTES:
+            return
+        logger.warning(f"EPUB too small ({os.path.getsize(epub_file_path)}B), regenerating: {epub_file_path}")
+        os.remove(epub_file_path)
     logger.info(f"Converting cleaned content from {cleaned_html_path} to EPUB")
 
     extra_args = [
