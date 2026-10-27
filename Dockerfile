@@ -10,8 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
 # Install system dependencies
+# gcc is needed for some Python packages
+# libgomp1 is needed by wasmtime's SIMD WASM execution
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
@@ -23,6 +26,7 @@ RUN mkdir -p /data /config && chmod 744 /data /config
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
+COPY anubis.py .
 COPY db.py .
 COPY epub.css .
 COPY feeder.py .
