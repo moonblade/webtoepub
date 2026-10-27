@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import List
+from typing import List, Optional
 from db import add_entry, has_entry, sync_from_imap, get_all_feeds, migrate_feeds_from_json, update_feed
 from models import EmailBatch, Entry, EntryType, Feed, FeedItem
 import feedparser
@@ -13,6 +13,7 @@ from mail import send_gmail
 import pypandoc
 import re
 from ebooklib import epub
+from anubis import make_royal_road_session, solve_anubis
 
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DATA_PATH = os.getenv("DATA_PATH", "/data")
@@ -20,6 +21,17 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
 MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "20"))
 ENTRY_THRESHOLD_FOR_NEW_BOOK = int(os.getenv("ENTRY_THRESHOLD_FOR_NEW_BOOK", "5"))
 logger = custom_logger(__name__)
+
+# Shared authenticated session for Royal Road (Anubis auth cookie lasts ~7 days)
+_royal_road_session: Optional[requests.Session] = None
+
+def _get_royal_road_session() -> requests.Session:
+    """Return (and lazily create) the shared Royal Road session with Anubis auth."""
+    global _royal_road_session
+    if _royal_road_session is None:
+        logger.info("Creating authenticated Royal Road session (solving Anubis challenge)...")
+        _royal_road_session = make_royal_road_session()
+    return _royal_road_session
 
 def normalize_royal_road_url(url: str) -> str:
     """
@@ -111,6 +123,30 @@ def _make_session() -> HTMLSession:
     return HTMLSession()
 
 
+def _download_html(url: str) -> str:
+    """
+    Fetch a URL and return its HTML content as a string.
+
+    Royal Road pages are fetched using the shared Anubis-authenticated
+    requests.Session.  All other URLs fall back to HTMLSession (pyppeteer).
+    """
+    if "royalroad.com" in url:
+        session = _get_royal_road_session()
+        response = session.get(url)
+        # Re-authenticate if Anubis blocks us again (e.g. cookie expired)
+        if response.status_code == 200 and "anubis_challenge" in response.text:
+            logger.warning("Royal Road Anubis cookie expired, re-authenticating...")
+            solve_anubis(session, url)
+            response = session.get(url)
+        response.raise_for_status()
+        return response.text
+    else:
+        session = _make_session()
+        response = session.get(url)
+        response.raise_for_status()
+        return response.html.html
+
+
 def download(entry: Entry, feed: FeedItem):
     """
     Downloads the content of an entry to disk.
@@ -122,11 +158,9 @@ def download(entry: Entry, feed: FeedItem):
     html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
     if not os.path.exists(html_file_path):
         logger.info(f"Downloading content from {entry.link} to {html_file_path}")
-        session = _make_session()
-        response = session.get(entry.link)
-        response.raise_for_status()
+        html = _download_html(entry.link)
         with open(html_file_path, "w") as f:
-            f.write(response.html.html)
+            f.write(html)
         logger.info(f"Downloaded content {html_file_path}")
 
     # Always check for patreon lock, even on cached files — TWI may add the gate
@@ -340,11 +374,8 @@ def get_royal_road_chapters(feed_url: str) -> List[Entry]:
         
         logger.info(f"Scraping Royal Road table of contents from {fiction_url}")
 
-        session = _make_session()
-        response = session.get(fiction_url)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.html.html, "lxml")
+        html = _download_html(fiction_url)
+        soup = BeautifulSoup(html, "lxml")
         
         # Find the table of contents - Royal Road uses <table id="chapters">
         chapters_table = soup.find("table", id="chapters")
