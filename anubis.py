@@ -2,15 +2,16 @@
 Anubis proof-of-work challenge solver.
 
 Royal Road (and other sites) use Anubis (https://github.com/TecharoHQ/anubis)
-to block automated scrapers. This module solves the challenge using the site's
-own WASM module via wasmtime, then returns an authenticated requests.Session
-that can fetch pages freely for ~7 days per cookie.
+to block automated scrapers. This module solves the challenge, then returns an
+authenticated requests.Session that can fetch pages freely for ~7 days per cookie.
 
-Supported algorithms: argon2id, sha256, hashx (all WASM-based).
-Falls back gracefully if WASM fetch fails.
+Supported algorithms:
+  - fast: SHA-256 hashcash (pure Python, no WASM needed)
+  - argon2id, sha256, hashx: WASM-based (via wasmtime)
 """
 
 import ctypes
+import hashlib
 import json
 import re
 import time
@@ -130,6 +131,32 @@ def _solve_wasm(
     return hash_hex, result_nonce, elapsed_ms
 
 
+def _solve_fast(random_data: str, difficulty: int) -> tuple[str, int, int]:
+    """
+    Solve Anubis 'fast' algorithm: SHA-256 hashcash.
+
+    Find a nonce such that SHA-256(randomData + str(nonce)) has the required
+    number of leading zero bytes (difficulty // 2), with the high nibble of the
+    next byte also zero if difficulty is odd.
+
+    Returns (response_hash_hex, nonce, elapsed_ms).
+    """
+    required_zero_bytes = difficulty // 2
+    is_odd = (difficulty % 2) != 0
+    nonce = 0
+    t0 = time.time()
+    while True:
+        digest = hashlib.sha256(f"{random_data}{nonce}".encode()).digest()
+        valid = all(digest[i] == 0 for i in range(required_zero_bytes))
+        if valid and is_odd:
+            valid = (digest[required_zero_bytes] >> 4) == 0
+        if valid:
+            elapsed_ms = int((time.time() - t0) * 1000)
+            logger.info(f"Anubis 'fast' PoW solved: nonce={nonce}, elapsed={elapsed_ms}ms")
+            return digest.hex(), nonce, elapsed_ms
+        nonce += 1
+
+
 def solve_anubis(session: requests.Session, url: str) -> bool:
     """
     Detect and solve an Anubis challenge for *url*, adding the auth cookie to
@@ -173,11 +200,14 @@ def solve_anubis(session: requests.Session, url: str) -> bool:
         logger.debug(f"css-load: {css_r.status_code}")
 
     try:
-        response_hash, nonce, elapsed_ms = _solve_wasm(
-            session, base_url, algorithm, random_data, difficulty
-        )
+        if algorithm == "fast":
+            response_hash, nonce, elapsed_ms = _solve_fast(random_data, difficulty)
+        else:
+            response_hash, nonce, elapsed_ms = _solve_wasm(
+                session, base_url, algorithm, random_data, difficulty
+            )
     except Exception as e:
-        logger.error(f"Anubis WASM solver failed: {e}")
+        logger.error(f"Anubis solver failed: {e}")
         return False
 
     # Submit the proof-of-work solution
