@@ -205,6 +205,7 @@ def clean_wandering_inn(html_content: str) -> str:
 _RR_INLINE_WATERMARKS = [
     "love this story? find the genuine version on the author's preferred platform and support their work",
     "support the creativity of authors by visiting the original site for this novel and more",
+    "if you enjoy this story, the best way to help the author is to read it where they publish it, not on a copy like this",
 ]
 
 def clean_royal_road(html_content: str, keywords_to_remove: List[str]) -> str:
