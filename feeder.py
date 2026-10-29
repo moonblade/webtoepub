@@ -107,10 +107,35 @@ def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
 
 
 
+_fs_session_id: Optional[str] = None
+
+def _get_flaresolverr_session() -> str:
+    """Create (or return existing) a persistent FlareSolverr browser session."""
+    global _fs_session_id
+    if _fs_session_id is None:
+        resp = requests.post(FLARESOLVERR_URL, json={"cmd": "sessions.create"}, timeout=30)
+        resp.raise_for_status()
+        _fs_session_id = resp.json()["session"]
+        logger.info(f"Created FlareSolverr session: {_fs_session_id}")
+    return _fs_session_id
+
 def _download_html_flaresolverr(url: str) -> str:
-    """Fetch a URL via FlareSolverr to bypass Cloudflare protection."""
-    payload = {"cmd": "request.get", "url": url, "maxTimeout": 60000}
+    """Fetch a URL via FlareSolverr, reusing a persistent browser session."""
+    session_id = _get_flaresolverr_session()
+    payload = {"cmd": "request.get", "url": url, "maxTimeout": 60000, "session": session_id}
     response = requests.post(FLARESOLVERR_URL, json=payload, timeout=90)
+    if response.status_code == 500:
+        # Session may have expired — destroy and recreate
+        global _fs_session_id
+        logger.warning("FlareSolverr session error, recreating session...")
+        try:
+            requests.post(FLARESOLVERR_URL, json={"cmd": "sessions.destroy", "session": session_id}, timeout=10)
+        except Exception:
+            pass
+        _fs_session_id = None
+        session_id = _get_flaresolverr_session()
+        payload["session"] = session_id
+        response = requests.post(FLARESOLVERR_URL, json=payload, timeout=90)
     response.raise_for_status()
     data = response.json()
     if data.get("status") != "ok":
