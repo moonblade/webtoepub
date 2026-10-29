@@ -13,25 +13,13 @@ from mail import send_gmail
 import pypandoc
 import re
 from ebooklib import epub
-from anubis import make_royal_road_session, solve_anubis
-
 WANDERING_INN_URL_FRAGMENT = os.getenv("WANDERING_INN_URL_FRAGMENT", "wanderinginn")
 DATA_PATH = os.getenv("DATA_PATH", "/data")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false") == "true"
 MAX_BATCH_SIZE = int(os.getenv("MAX_BATCH_SIZE", "20"))
 ENTRY_THRESHOLD_FOR_NEW_BOOK = int(os.getenv("ENTRY_THRESHOLD_FOR_NEW_BOOK", "5"))
+FLARESOLVERR_URL = os.getenv("FLARESOLVERR_URL", "http://flaresolverr:8191/v1")
 logger = custom_logger(__name__)
-
-# Shared authenticated session for Royal Road (Anubis auth cookie lasts ~7 days)
-_royal_road_session: Optional[requests.Session] = None
-
-def _get_royal_road_session() -> requests.Session:
-    """Return (and lazily create) the shared Royal Road session with Anubis auth."""
-    global _royal_road_session
-    if _royal_road_session is None:
-        logger.info("Creating authenticated Royal Road session (solving Anubis challenge)...")
-        _royal_road_session = make_royal_road_session()
-    return _royal_road_session
 
 def normalize_royal_road_url(url: str) -> str:
     """
@@ -118,30 +106,30 @@ def is_patreon_locked(entry: Entry, html_file_path: str) -> bool:
         return False
 
 
-def _make_session() -> HTMLSession:
-    """Create an HTMLSession for downloading chapter content."""
-    return HTMLSession()
+
+def _download_html_flaresolverr(url: str) -> str:
+    """Fetch a URL via FlareSolverr to bypass Cloudflare protection."""
+    payload = {"cmd": "request.get", "url": url, "maxTimeout": 60000}
+    response = requests.post(FLARESOLVERR_URL, json=payload, timeout=90)
+    response.raise_for_status()
+    data = response.json()
+    if data.get("status") != "ok":
+        raise RuntimeError(f"FlareSolverr error: {data.get('message', data)}")
+    return data["solution"]["response"]
 
 
 def _download_html(url: str) -> str:
     """
     Fetch a URL and return its HTML content as a string.
 
-    Royal Road pages are fetched using the shared Anubis-authenticated
-    requests.Session.  All other URLs fall back to HTMLSession (pyppeteer).
+    Royal Road pages are fetched via FlareSolverr to bypass Cloudflare.
+    All other URLs fall back to HTMLSession (pyppeteer).
     """
     if "royalroad.com" in url:
-        session = _get_royal_road_session()
-        response = session.get(url)
-        # Re-authenticate if Anubis blocks us again (e.g. cookie expired)
-        if response.status_code == 200 and "anubis_challenge" in response.text:
-            logger.warning("Royal Road Anubis cookie expired, re-authenticating...")
-            solve_anubis(session, url)
-            response = session.get(url)
-        response.raise_for_status()
-        return response.text
+        logger.info(f"Fetching via FlareSolverr: {url}")
+        return _download_html_flaresolverr(url)
     else:
-        session = _make_session()
+        session = HTMLSession()
         response = session.get(url)
         response.raise_for_status()
         return response.html.html
