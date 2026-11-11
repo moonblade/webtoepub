@@ -383,8 +383,11 @@ def send_email(entry: Entry, feed: FeedItem):
 
 def get_royal_road_chapters(feed_url: str) -> List[Entry]:
     """
-    Scrapes the Royal Road table of contents page to get all chapter links.
-    Extracts the fiction ID from the RSS feed URL and constructs the main page URL.
+    Fetches all chapter links for a Royal Road fiction.
+
+    Royal Road embeds the full chapter list as a JSON blob (window.chapters = [...])
+    in the page HTML. We extract that instead of parsing the visible <table id="chapters">,
+    which only shows the most recent ~20 chapters due to JS lazy-loading.
     """
     try:
         # Extract fiction ID from RSS URL (e.g., /fiction/syndication/36049 -> 36049)
@@ -399,32 +402,53 @@ def get_royal_road_chapters(feed_url: str) -> List[Entry]:
         logger.info(f"Scraping Royal Road table of contents from {fiction_url}")
 
         html = _download_html(fiction_url)
+
+        # Extract window.chapters JSON — contains ALL chapters, unlike the visible table
+        # which only shows the most recent ~20 due to JS lazy-loading.
+        import json as _json
+        chapters_json_match = re.search(r'window\.chapters\s*=\s*(\[.*?\]);', html, re.DOTALL)
+        if chapters_json_match:
+            chapters_data = _json.loads(chapters_json_match.group(1))
+            logger.info(f"Extracted {len(chapters_data)} chapters from window.chapters")
+            entries = []
+            for ch in chapters_data:
+                chapter_id = ch.get("id")
+                chapter_title = ch.get("title", "")
+                if not chapter_id:
+                    continue
+                # Use embedded url if present, else construct from id+slug
+                ch_url = ch.get("url")
+                if ch_url:
+                    chapter_url = "https://www.royalroad.com" + ch_url if ch_url.startswith("/") else ch_url
+                else:
+                    chapter_slug = ch.get("slug", "")
+                    fiction_slug_match = re.search(r'/fiction/\d+/([^/]+)', html)
+                    fiction_slug = fiction_slug_match.group(1) if fiction_slug_match else "book"
+                    chapter_url = f"https://www.royalroad.com/fiction/{fiction_id}/{fiction_slug}/chapter/{chapter_id}/{chapter_slug}"
+                entry = Entry(
+                    title=chapter_title,
+                    link=chapter_url,
+                    entryType=EntryType.royalroad,
+                    published_parsed=time.localtime()
+                )
+                entries.append(entry)
+            return entries
+
+        # Fallback: parse visible HTML table (may only return recent chapters)
+        logger.warning("window.chapters not found, falling back to HTML table scrape")
         soup = BeautifulSoup(html, "lxml")
-        
-        # Find the table of contents - Royal Road uses <table id="chapters">
         chapters_table = soup.find("table", id="chapters")
         if not chapters_table:
             logger.error("Could not find chapters table on Royal Road page")
             return []
         
-        # Get the book title
-        title_element = soup.find("h1", class_="font-white")
-        book_title = title_element.get_text(strip=True) if title_element else "Unknown Book"
-        
         entries = []
-        # Find all chapter rows in the table
-        chapter_rows = chapters_table.find_all("tr")
-        
-        for row in chapter_rows:
-            # Find the link in the row
+        for row in chapters_table.find_all("tr"):
             link = row.find("a", href=re.compile(r"/fiction/\d+/[^/]+/chapter/\d+"))
             if not link:
                 continue
-                
             chapter_url = "https://www.royalroad.com" + link['href']
             chapter_title = link.get_text(strip=True)
-            
-            # Create Entry object with current timestamp for published_parsed
             entry = Entry(
                 title=chapter_title,
                 link=chapter_url,
