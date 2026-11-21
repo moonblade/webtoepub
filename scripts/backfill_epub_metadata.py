@@ -47,7 +47,7 @@ logger = custom_logger("backfill_epub_metadata")
 
 DATA_PATH = os.getenv("DATA_PATH", "/data")
 DRY_RUN = os.getenv("DEBUG_MODE", "false").lower() == "true"
-CHECKPOINT_PATH = os.getenv("CHECKPOINT_PATH", "/tmp/backfill_checkpoint.json")
+CHECKPOINT_PATH = os.getenv("CHECKPOINT_PATH", os.path.join(DATA_PATH, "backfill_checkpoint.json"))
 
 
 # ---------------------------------------------------------------------------
