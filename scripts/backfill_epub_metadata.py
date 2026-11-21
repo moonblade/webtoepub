@@ -6,64 +6,102 @@ What it does:
   - Iterates every <feed_title>/<chapter>.epub in DATA_PATH
   - Skips compiled _compiled.epub files (those are re-generated differently)
   - For each chapter EPUB, checks if the corresponding cleaned HTML exists
-  - If yes: deletes the old EPUB and re-runs convert_to_epub() with the new
-    metadata (calibre:series, calibre:series_index, author, dc:subject)
+  - If yes: rewrites the EPUB via pandoc with calibre:series/series_index/author metadata
   - Derives series_index from the chapter title via _extract_chapter_number()
 
-Run inside the container or with the same venv as feeder.py:
-  python3 scripts/backfill_epub_metadata.py
+Checkpoint / resume support:
+  - A checkpoint file (CHECKPOINT_PATH, default /tmp/backfill_checkpoint.json) records
+    every successfully rewritten EPUB path.
+  - On re-run, already-checkpointed files are skipped instantly.
+  - Delete the checkpoint file to force a full re-run from scratch.
 
-Environment variables (same as feeder.py):
-  DATA_PATH   — default /data
-  DEBUG_MODE  — set to "true" for a dry run (no deletes/conversions)
+Run inside the container or with the same venv as feeder.py:
+  cd /app && python3 backfill_epub_metadata.py
+
+Environment variables:
+  DATA_PATH        — default /data
+  DEBUG_MODE       — set to "true" for a dry run (no writes, no checkpoint updates)
+  CHECKPOINT_PATH  — default /tmp/backfill_checkpoint.json
 """
 
+import json
 import os
-import sys
 import re
+import sys
+import tempfile
 
 # Add parent dir to path so we can import feeder modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from feeder import (
-    _extract_chapter_number,
     _build_epub_metadata_xml,
+    _extract_chapter_number,
     sanitize_filename,
 )
 from db import get_all_feeds
 from models import FeedItem
 from utils import custom_logger
 import pypandoc
-import tempfile
 
 logger = custom_logger("backfill_epub_metadata")
 
 DATA_PATH = os.getenv("DATA_PATH", "/data")
 DRY_RUN = os.getenv("DEBUG_MODE", "false").lower() == "true"
+CHECKPOINT_PATH = os.getenv("CHECKPOINT_PATH", "/tmp/backfill_checkpoint.json")
 
 
-def get_feed_map() -> dict[str, FeedItem]:
-    """
-    Returns a dict of {sanitized_folder_name: FeedItem} from the DB.
-    We match by sanitized title since that's how folders are named.
-    """
+# ---------------------------------------------------------------------------
+# Checkpoint helpers
+# ---------------------------------------------------------------------------
+
+def load_checkpoint() -> set:
+    """Load the set of already-completed epub paths from the checkpoint file."""
+    if os.path.exists(CHECKPOINT_PATH):
+        try:
+            with open(CHECKPOINT_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            done = set(data.get("done", []))
+            logger.info(f"Checkpoint loaded: {len(done)} already-done files from {CHECKPOINT_PATH}")
+            return done
+        except Exception as e:
+            logger.warning(f"Could not read checkpoint ({e}); starting fresh")
+    return set()
+
+
+def save_checkpoint(done: set):
+    """Persist the checkpoint atomically."""
+    if DRY_RUN:
+        return
+    tmp = CHECKPOINT_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"done": sorted(done)}, f)
+    os.replace(tmp, CHECKPOINT_PATH)
+
+
+# ---------------------------------------------------------------------------
+# Feed helpers
+# ---------------------------------------------------------------------------
+
+def get_feed_map() -> dict:
+    """Return {sanitized_folder_name: FeedItem} from the DB."""
     feeds = get_all_feeds()
     result = {}
     for f in feeds:
         item = FeedItem(**f) if isinstance(f, dict) else f
-        # Reproduce the same title stripping feeder does
         title = re.sub(r"\[.*?\]", "", item.title or item.name).strip()
         result[sanitize_filename(title)] = item
     return result
 
 
-def rewrite_epub(epub_path: str, cleaned_html_path: str, title: str, author: str, series: str, series_index=None):
-    """
-    Delete existing EPUB and regenerate it from cleaned HTML with new metadata.
-    """
-    logger.info(f"  Rewriting: {os.path.basename(epub_path)}")
+# ---------------------------------------------------------------------------
+# EPUB rewrite
+# ---------------------------------------------------------------------------
+
+def rewrite_epub(epub_path: str, cleaned_html_path: str, title: str,
+                 author: str, series: str, series_index=None) -> bool:
+    """Rewrite an EPUB in-place with Calibre-compatible OPF metadata."""
     if DRY_RUN:
-        logger.info(f"  [DRY RUN] Would rewrite {epub_path}")
+        logger.info(f"  [DRY RUN] Would rewrite: {os.path.basename(epub_path)}")
         return True
 
     metadata_xml = _build_epub_metadata_xml(
@@ -79,11 +117,12 @@ def rewrite_epub(epub_path: str, cleaned_html_path: str, title: str, author: str
         metadata_file_path = mf.name
 
     try:
-        # epub.css lives next to feeder.py (parent dir of scripts/, or /app in container)
+        # epub.css lives next to feeder.py (parent dir of scripts/, or cwd in container)
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         css_path = os.path.join(script_dir, 'epub.css')
         if not os.path.exists(css_path):
             css_path = os.path.join(os.getcwd(), 'epub.css')
+
         extra_args = [
             '--epub-metadata', metadata_file_path,
             '--metadata', 'lang=en-US',
@@ -103,16 +142,21 @@ def rewrite_epub(epub_path: str, cleaned_html_path: str, title: str, author: str
     return True
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main():
-    logger.info(f"Starting EPUB metadata backfill (DATA_PATH={DATA_PATH}, DRY_RUN={DRY_RUN})")
+    logger.info(
+        f"Starting EPUB metadata backfill "
+        f"(DATA_PATH={DATA_PATH}, DRY_RUN={DRY_RUN}, CHECKPOINT={CHECKPOINT_PATH})"
+    )
 
+    done = load_checkpoint()
     feed_map = get_feed_map()
-    logger.info(f"Loaded {len(feed_map)} feeds from DB: {list(feed_map.keys())}")
+    logger.info(f"Loaded {len(feed_map)} feeds from DB")
 
-    total = 0
-    skipped = 0
-    rewritten = 0
-    errors = 0
+    total = skipped_checkpoint = skipped_no_html = rewritten = errors = 0
 
     for folder_name in sorted(os.listdir(DATA_PATH)):
         folder_path = os.path.join(DATA_PATH, folder_name)
@@ -124,11 +168,10 @@ def main():
             logger.warning(f"No feed found for folder '{folder_name}' — skipping")
             continue
 
-        # Reconstruct series title the same way feeder does
         series = re.sub(r"\[.*?\]", "", feed_item.title or feed_item.name).strip()
         author = feed_item.author if feed_item.author else series
 
-        logger.info(f"\nProcessing feed: {series} ({folder_name})")
+        logger.info(f"\nProcessing feed: {series}")
         cleaned_dir = os.path.join(folder_path, "cleaned")
 
         epub_files = [
@@ -141,21 +184,22 @@ def main():
             total += 1
             epub_path = os.path.join(folder_path, epub_filename)
 
-            # Derive chapter title from filename (reverse of sanitize_filename)
-            # The filename IS the sanitized title + .epub
+            # Resume: skip if already done in a previous run
+            if epub_path in done:
+                skipped_checkpoint += 1
+                continue
+
             chapter_title = epub_filename[:-5]  # strip .epub
-            # Replace sanitized chars back — only underscores from spaces
-            # (other chars were replaced with - and we can't reverse that, but title is used for display)
             chapter_display_title = chapter_title.replace('_', ' ')
 
-            # Find corresponding cleaned HTML
             cleaned_html = os.path.join(cleaned_dir, f"{chapter_title}.html")
             if not os.path.exists(cleaned_html):
                 logger.warning(f"  No cleaned HTML for {epub_filename} — skipping")
-                skipped += 1
+                skipped_no_html += 1
                 continue
 
             series_index = _extract_chapter_number(chapter_display_title)
+            logger.info(f"  Rewriting: {epub_filename}")
 
             try:
                 rewrite_epub(
@@ -167,15 +211,20 @@ def main():
                     series_index=series_index,
                 )
                 rewritten += 1
+                done.add(epub_path)
+                # Flush checkpoint after every successful write so crashes are resumable
+                save_checkpoint(done)
             except Exception as e:
                 logger.error(f"  ERROR rewriting {epub_filename}: {e}")
                 errors += 1
 
     logger.info(f"\n=== Backfill complete ===")
-    logger.info(f"  Total:    {total}")
-    logger.info(f"  Rewritten:{rewritten}")
-    logger.info(f"  Skipped:  {skipped}")
-    logger.info(f"  Errors:   {errors}")
+    logger.info(f"  Total found:        {total}")
+    logger.info(f"  Rewritten:          {rewritten}")
+    logger.info(f"  Skipped (checkpoint):{skipped_checkpoint}")
+    logger.info(f"  Skipped (no HTML):  {skipped_no_html}")
+    logger.info(f"  Errors:             {errors}")
+    logger.info(f"  Checkpoint:         {CHECKPOINT_PATH}")
 
 
 if __name__ == "__main__":
