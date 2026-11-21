@@ -11,6 +11,7 @@ class FeedItem(BaseModel):
     title: str = ""
     name: str
     url: str
+    author: Optional[str] = None  # Author name for EPUB metadata (defaults to feed title)
     ignore: Optional[bool] = False
     dry_run: Optional[bool] = False
     one_shot: Optional[bool] = False  # Process once then auto-set ignore=True
