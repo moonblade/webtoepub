@@ -278,10 +278,57 @@ def clean(entry: Entry, feed: FeedItem):
         f.write(cleaned_html)
     logger.info(f"Cleaned content saved to {cleaned_file_path}")
 
-def convert_to_epub(entry: Entry, feed: FeedItem):
+def _extract_chapter_number(title: str) -> Optional[float]:
+    """
+    Extracts a chapter number from an entry title for use as series_index.
+    Handles patterns like 'Chapter 42', 'Ch. 42', 'Book 2 Chapter 5', '42 - Title', etc.
+    Returns None if no number can be found.
+    """
+    # Try explicit chapter/ch patterns first
+    match = re.search(r'[Cc]h(?:apter|\.)?\s*([0-9]+(?:\.[0-9]+)?)', title)
+    if match:
+        return float(match.group(1))
+    # Leading number pattern: '42 - Some Title' or '042. Title'
+    match = re.match(r'^([0-9]+(?:\.[0-9]+)?)\s*[\-\.\:]', title)
+    if match:
+        return float(match.group(1))
+    # Trailing number: 'Some Title 42'
+    match = re.search(r'\b([0-9]+(?:\.[0-9]+)?)\s*$', title)
+    if match:
+        return float(match.group(1))
+    return None
+
+
+def _build_epub_metadata_xml(title: str, author: str, series: str, series_index: Optional[float], language: str = "en-US") -> str:
+    """
+    Builds an OPF/Dublin Core XML metadata snippet for use with pandoc --epub-metadata.
+    Includes calibre:series and calibre:series_index meta tags so Calibre groups
+    chapters under the correct series/book.
+    """
+    def esc(s: str) -> str:
+        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+    lines = [
+        f'<dc:title>{esc(title)}</dc:title>',
+        f'<dc:creator opf:role="aut">{esc(author)}</dc:creator>',
+        f'<dc:subject>{esc(series)}</dc:subject>',
+        f'<dc:language>{esc(language)}</dc:language>',
+        f'<meta name="calibre:series" content="{esc(series)}"/>',
+    ]
+    if series_index is not None:
+        idx_str = str(int(series_index)) if series_index == int(series_index) else str(series_index)
+        lines.append(f'<meta name="calibre:series_index" content="{idx_str}"/>')
+    return "\n".join(lines)
+
+
+def convert_to_epub(entry: Entry, feed: FeedItem, chapter_index: Optional[int] = None):
     """
     Converts the cleaned content of an entry to an EPUB file.
+    Embeds rich metadata (author, series, series_index, subject) so Calibre
+    can group chapters by book/series.
     """
+    import tempfile
+
     feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
     cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
     epub_file_path_no_space = os.path.join(feed_path, f"{sanitize_filename(entry.get_file_name())}.epub")
@@ -294,19 +341,40 @@ def convert_to_epub(entry: Entry, feed: FeedItem):
         os.remove(epub_file_path)
     logger.info(f"Converting cleaned content from {cleaned_html_path} to EPUB")
 
-    extra_args = [
-        '--metadata', f'title={entry.title}',
-        '--metadata', 'lang=en-US',
-        '--css', "./epub.css",
-        '--epub-title-page=false'
-    ]
+    # Determine author: use feed.author if set, else fall back to feed title
+    author = feed.author if feed.author else feed.title
 
-    pypandoc.convert_file(
-        cleaned_html_path,
-        'epub',
-        outputfile=epub_file_path_no_space,
-        extra_args=extra_args
+    # Determine series_index: prefer explicit chapter_index, then extract from title
+    series_idx: Optional[float] = float(chapter_index) if chapter_index is not None else _extract_chapter_number(entry.title)
+
+    # Write OPF metadata XML to a temp file (pandoc --epub-metadata supports calibre meta tags)
+    metadata_xml = _build_epub_metadata_xml(
+        title=entry.title,
+        author=author,
+        series=feed.title,
+        series_index=series_idx,
     )
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False, encoding='utf-8') as mf:
+        mf.write(metadata_xml)
+        metadata_file_path = mf.name
+
+    try:
+        extra_args = [
+            '--epub-metadata', metadata_file_path,
+            '--metadata', 'lang=en-US',
+            '--css', "./epub.css",
+            '--epub-title-page=false'
+        ]
+
+        pypandoc.convert_file(
+            cleaned_html_path,
+            'epub',
+            outputfile=epub_file_path_no_space,
+            extra_args=extra_args
+        )
+    finally:
+        os.unlink(metadata_file_path)
+
     os.rename(epub_file_path_no_space, epub_file_path)
     logger.info(f"EPUB file saved to {epub_file_path}")
 
@@ -464,7 +532,7 @@ def get_royal_road_chapters(feed_url: str) -> List[Entry]:
         logger.exception(f"Error scraping Royal Road table of contents: {e}")
         return []
 
-def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, skip_date: bool = False):
+def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, skip_date: bool = False, chapter_index: Optional[int] = None):
     """
     Processes a single entry in a feed.
     """
@@ -488,7 +556,7 @@ def process_entry(entry: Entry, feed: FeedItem, skip_email_prep: bool = False, s
             logger.info(f"Ignoring entry after download: {entry.title}")
             return
         clean(entry, feed)
-        convert_to_epub(entry, feed)
+        convert_to_epub(entry, feed, chapter_index=chapter_index)
         if skip_email_prep:
             return None
         return prepare_email(entry, feed)
@@ -513,10 +581,16 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
 
     logger.info(f"Creating compiled ebook for {feed.title} with {len(entries)} chapters")
 
+    author = feed.author if feed.author else feed.title
+
     merged = epub.EpubBook()
     merged.set_identifier(f"compiled-{sanitize_filename(feed.title)}")
     merged.set_title(f"{feed.title} - Complete")
     merged.set_language("en")
+    merged.add_author(author)
+    merged.add_metadata('DC', 'subject', feed.title)
+    merged.add_metadata(None, 'meta', '', {'name': 'calibre:series', 'content': feed.title})
+    merged.add_metadata(None, 'meta', '', {'name': 'calibre:series_index', 'content': '1'})
 
     spine = ['nav']
     toc = []
@@ -562,6 +636,7 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
                 spine.append(chapter)
                 toc.append(epub.Link(chap_name, entry.title, chap_id))
                 chapters_added += 1
+                logger.debug(f"Added chapter {i+1}: {entry.title}")
 
             except Exception as e:
                 logger.warning(f"Failed to add chapter {entry.title}: {e}")
@@ -638,9 +713,9 @@ def process_feed_item(feed: FeedItem):
             
             # Process all entries without preparing individual emails
             processed_entries = []
-            for entry in unprocessed_entries:
+            for idx, entry in enumerate(unprocessed_entries, start=1):
                 try:
-                    process_entry(entry, feed, skip_email_prep=True, skip_date=True)
+                    process_entry(entry, feed, skip_email_prep=True, skip_date=True, chapter_index=idx)
                     processed_entries.append(entry)
                 except Exception as e:
                     logger.exception(f"Error processing entry: {e}")
