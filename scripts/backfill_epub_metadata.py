@@ -79,10 +79,15 @@ def rewrite_epub(epub_path: str, cleaned_html_path: str, title: str, author: str
         metadata_file_path = mf.name
 
     try:
+        # epub.css lives next to feeder.py (parent dir of scripts/, or /app in container)
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        css_path = os.path.join(script_dir, 'epub.css')
+        if not os.path.exists(css_path):
+            css_path = os.path.join(os.getcwd(), 'epub.css')
         extra_args = [
             '--epub-metadata', metadata_file_path,
             '--metadata', 'lang=en-US',
-            '--css', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'epub.css'),
+            '--css', css_path,
             '--epub-title-page=false',
         ]
         pypandoc.convert_file(
