@@ -2,7 +2,7 @@ import logging
 import os
 import re
 from db import get_entries, get_all_feeds, get_feed_by_url, add_feed, update_feed, delete_feed, migrate_feeds_from_json
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from datetime import datetime
 from utils import custom_logger
@@ -54,8 +54,8 @@ async def get_status():
     return timestamp
 
 @app.post("/execute")
-async def _execute():
-    execute()
+async def _execute(background_tasks: BackgroundTasks):
+    background_tasks.add_task(execute)
     return "ok"
 
 @app.get("/sent_items")

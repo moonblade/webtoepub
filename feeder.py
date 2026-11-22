@@ -164,7 +164,7 @@ def download(entry: Entry, feed: FeedItem):
     """
     Downloads the content of an entry to disk.
     """
-    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.name))
     html_download_path = os.path.join(feed_path, "html")
     os.makedirs(feed_path, exist_ok=True)
     os.makedirs(html_download_path, exist_ok=True)
@@ -246,7 +246,7 @@ def clean(entry: Entry, feed: FeedItem):
     """
     Cleans the downloaded content of an entry.
     """
-    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.name))
     html_download_path = os.path.join(feed_path, "html")
     html_file_path = os.path.join(html_download_path, f"{sanitize_filename(entry.title)}.html")
     cleaned_download_path = os.path.join(feed_path, "cleaned")
@@ -329,7 +329,7 @@ def convert_to_epub(entry: Entry, feed: FeedItem, chapter_index: Optional[int] =
     """
     import tempfile
 
-    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.name))
     cleaned_html_path = os.path.join(feed_path, "cleaned", f"{sanitize_filename(entry.title)}.html")
     epub_file_path_no_space = os.path.join(feed_path, f"{sanitize_filename(entry.get_file_name())}.epub")
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
@@ -383,7 +383,7 @@ def prepare_email(entry: Entry, feed: FeedItem):
     Prepares an email for sending by validating the EPUB file exists and entry hasn't been sent.
     Returns None if the email shouldn't be sent.
     """
-    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.name))
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     
     if not os.path.exists(epub_file_path):
@@ -430,7 +430,7 @@ def send_email(entry: Entry, feed: FeedItem):
     """
     Sends an email with the EPUB file attached.
     """
-    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.name))
     epub_file_path = os.path.join(feed_path, f"{sanitize_filename(entry.title)}.epub")
     if not os.path.exists(epub_file_path):
         logger.error(f"EPUB file not found: {epub_file_path}")
@@ -575,8 +575,8 @@ def create_compiled_ebook(entries: List[Entry], feed: FeedItem):
 
     Memory stays low because we read each cleaned HTML file one at a time.
     """
-    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.title))
-    compiled_epub_filename = f"{sanitize_filename(feed.title)}_compiled.epub"
+    feed_path = os.path.join(DATA_PATH, sanitize_filename(feed.name))
+    compiled_epub_filename = f"{sanitize_filename(feed.name)}_compiled.epub"
     compiled_epub_path = os.path.join(feed_path, compiled_epub_filename)
 
     logger.info(f"Creating compiled ebook for {feed.title} with {len(entries)} chapters")
