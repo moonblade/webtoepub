@@ -358,6 +358,14 @@ def convert_to_epub(entry: Entry, feed: FeedItem, chapter_index: Optional[int] =
         mf.write(metadata_xml)
         metadata_file_path = mf.name
 
+    # Prepend an <h1> with the chapter title so it appears as a heading inside the EPUB
+    with open(cleaned_html_path, 'r', encoding='utf-8') as f:
+        cleaned_html_content = f.read()
+    titled_html_content = f'<h1>{entry.title}</h1>\n{cleaned_html_content}'
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as tf:
+        tf.write(titled_html_content)
+        titled_html_path = tf.name
+
     try:
         extra_args = [
             '--epub-metadata', metadata_file_path,
@@ -367,13 +375,14 @@ def convert_to_epub(entry: Entry, feed: FeedItem, chapter_index: Optional[int] =
         ]
 
         pypandoc.convert_file(
-            cleaned_html_path,
+            titled_html_path,
             'epub',
             outputfile=epub_file_path_no_space,
             extra_args=extra_args
         )
     finally:
         os.unlink(metadata_file_path)
+        os.unlink(titled_html_path)
 
     os.rename(epub_file_path_no_space, epub_file_path)
     logger.info(f"EPUB file saved to {epub_file_path}")
